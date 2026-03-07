@@ -25,6 +25,8 @@ import {
   LayoutGrid,
   Plug,
   Calculator,
+  Activity,
+  Grid3X3,
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { Badge } from '@/components/ui/badge';
@@ -102,6 +104,8 @@ const navGroups = [
       { href: '/channel-analytics', icon: <TrendingUp size={18} />, label: 'Channel Analytics' },
       { href: '/output-types', icon: <Layers size={18} />, label: 'Output Types' },
       { href: '/language-analytics', icon: <Globe2 size={18} />, label: 'Language Analytics' },
+      { href: '/usage-trends', icon: <Activity size={18} />, label: 'Usage Trends' },
+      { href: '/multi-dimensional', icon: <Grid3X3 size={18} />, label: 'Multi-Dimensional' },
     ],
   },
   {
@@ -137,6 +141,7 @@ const navGroups = [
     items: [
       { href: '/team-productivity', icon: <Users size={18} />, label: 'Team Productivity' },
       { href: '/client-portal', icon: <BookOpen size={18} />, label: 'Client Portal' },
+      { href: '/client-performance', icon: <Zap size={18} />, label: 'Client Performance' },
       { href: '/processing-insights', icon: <Cpu size={18} />, label: 'Processing Insights' },
     ],
   },

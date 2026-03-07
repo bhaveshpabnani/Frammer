@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard-layout';
 import { PageHeader } from '@/components/page-header';
 import { StatsCard } from '@/components/stats-card';
@@ -7,10 +7,11 @@ import {
   PieChart, Pie, Cell, BarChart, Bar,
   ResponsiveContainer, Tooltip, Legend, XAxis, YAxis, CartesianGrid,
 } from 'recharts';
-import { outputTypeData } from '@/data/mockData';
+import { outputTypeData as mockOutputTypes } from '@/data/mockData';
 import { CHART_COLORS, OUTPUT_TYPE_LABELS } from '@/types';
 import { Layers, Scissors, TrendingUp } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useOutputTypes, useMonthly } from '@/hooks/useApi';
 
 const DarkTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
@@ -28,18 +29,26 @@ const DarkTooltip = ({ active, payload, label }: any) => {
   );
 };
 
-// Monthly output type trend (simulated)
-const monthlyOutputTrend = [
-  { month: 'Sep 25', Reel: 180, Short: 138, 'Viral Clip': 127, Chapter: 104, Summary: 71 },
-  { month: 'Oct 25', Reel: 207, Short: 159, 'Viral Clip': 146, Chapter: 119, Summary: 81 },
-  { month: 'Nov 25', Reel: 228, Short: 176, 'Viral Clip': 161, Chapter: 131, Summary: 89 },
-  { month: 'Dec 25', Reel: 197, Short: 151, 'Viral Clip': 139, Chapter: 113, Summary: 77 },
-  { month: 'Jan 26', Reel: 254, Short: 195, 'Viral Clip': 179, Chapter: 146, Summary: 99 },
-  { month: 'Feb 26', Reel: 282, Short: 217, 'Viral Clip': 199, Chapter: 162, Summary: 110 },
-];
-
 const OutputTypes: React.FC = () => {
+  const { data: liveOutputTypes } = useOutputTypes();
+  const { data: liveMonthly } = useMonthly();
+  const outputTypeData = liveOutputTypes ?? mockOutputTypes;
   const total = outputTypeData.reduce((s, d) => s + d.count, 0);
+
+  useEffect(() => {
+    if (!liveOutputTypes) console.warn('[OutputTypes] Output type data unavailable — showing mock fallback');
+    if (!liveMonthly)     console.warn('[OutputTypes] Monthly data unavailable — showing mock fallback for trend chart');
+  }, [liveOutputTypes, liveMonthly]);
+
+  // Derive monthly trend from real data (last 6 months × output-type proportions)
+  const recentMonths = (liveMonthly ?? []).slice(-6);
+  const monthlyOutputTrend: Record<string, string | number>[] = recentMonths.map((m) => {
+    const row: Record<string, string | number> = { month: m.month };
+    outputTypeData.forEach((o) => {
+      row[o.type] = Math.round(m.videosProcessed * (o.count / Math.max(total, 1)));
+    });
+    return row;
+  });
 
   return (
     <DashboardLayout title="Output Types" subtitle="Breakdown of all short-form content formats produced">
@@ -94,18 +103,17 @@ const OutputTypes: React.FC = () => {
             </ResponsiveContainer>
           </ChartCard>
 
-          <ChartCard title="Output Type Trend" subtitle="Monthly volume per format (last 6 months)" height={280}>
+          <ChartCard title="Output Type Trend" subtitle="Proportional monthly volume by output type (last 6 months)" height={280}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthlyOutputTrend} margin={{ top: 4, right: 4, left: -20, bottom: 0 }} barGap={1} barCategoryGap="25%">
                 <CartesianGrid strokeDasharray="3 3" stroke="#1C1C1C" vertical={false} />
                 <XAxis dataKey="month" tick={{ fill: '#71717A', fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: '#71717A', fontSize: 11 }} axisLine={false} tickLine={false} />
                 <Tooltip content={<DarkTooltip />} />
-                <Bar dataKey="Reel" fill={CHART_COLORS.red} radius={[3, 3, 0, 0]} maxBarSize={14} />
-                <Bar dataKey="Short" fill={CHART_COLORS.blue} radius={[3, 3, 0, 0]} maxBarSize={14} />
-                <Bar dataKey="Viral Clip" fill={CHART_COLORS.amber} radius={[3, 3, 0, 0]} maxBarSize={14} />
-                <Bar dataKey="Chapter" fill={CHART_COLORS.purple} radius={[3, 3, 0, 0]} maxBarSize={14} />
-                <Bar dataKey="Summary" fill={CHART_COLORS.green} radius={[3, 3, 0, 0]} maxBarSize={14} />
+                <Legend formatter={(v) => <span style={{ color: '#A1A1AA', fontSize: 11 }}>{v}</span>} />
+                {outputTypeData.map((o) => (
+                  <Bar key={o.type} dataKey={o.type} fill={o.color} radius={[3, 3, 0, 0]} maxBarSize={14} />
+                ))}
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>

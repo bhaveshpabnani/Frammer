@@ -47,8 +47,12 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { channelMetrics, teamMetrics, languageData, outputTypeData } from '@/data/mockData';
+import {
+  channelMetrics as mockChannels, teamMetrics as mockTeam,
+  languageData as mockLanguages, outputTypeData as mockOutputTypes,
+} from '@/data/mockData';
 import { CHART_COLORS } from '@/types';
+import { useChannels, useUsers, useLanguages, useOutputTypes, useRunQuery } from '@/hooks/useApi';
 
 type MetricKey = 'videosProcessed' | 'clipsGenerated' | 'hours' | 'avgProcessingTime';
 type DimensionKey = 'channel' | 'teamMember' | 'language' | 'outputType';
@@ -107,7 +111,14 @@ const DarkTooltip: React.FC<any> = ({ active, payload, label }) => {
   );
 };
 
-function buildQueryResults(metric: MetricKey, dimension: DimensionKey): { name: string; value: number }[] {
+function buildQueryResults(
+  metric: MetricKey,
+  dimension: DimensionKey,
+  channelMetrics: typeof mockChannels,
+  teamMetrics: typeof mockTeam,
+  languageData: typeof mockLanguages,
+  outputTypeData: typeof mockOutputTypes,
+): { name: string; value: number }[] {
   switch (dimension) {
     case 'channel':
       return channelMetrics.map((c) => ({
@@ -173,7 +184,21 @@ export default function QueriesPage() {
   const [showSaved, setShowSaved] = useState(true);
   const { toast } = useToast();
 
-  const results = useMemo(() => ran ? buildQueryResults(metric, dimension) : [], [ran, metric, dimension]);
+  const { data: liveChannels } = useChannels();
+  const { data: liveUsers } = useUsers();
+  const { data: liveLanguages } = useLanguages();
+  const { data: liveOutputTypes } = useOutputTypes();
+  const runQueryMutation = useRunQuery();
+
+  const channelData = liveChannels ?? mockChannels;
+  const teamData = liveUsers ?? mockTeam;
+  const langData = liveLanguages ?? mockLanguages;
+  const outputData = liveOutputTypes ?? mockOutputTypes;
+
+  const results = useMemo(
+    () => ran ? buildQueryResults(metric, dimension, channelData, teamData, langData, outputData) : [],
+    [ran, metric, dimension, channelData, teamData, langData, outputData],
+  );
   const sql = useMemo(() => buildSQL(metric, dimension, aggregation, filters), [metric, dimension, aggregation, filters]);
 
   const metricInfo = METRICS.find((m) => m.value === metric)!;

@@ -1,305 +1,455 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { DashboardLayout } from '@/components/dashboard-layout';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import {
-  BarChart,
-  Bar,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
+  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import {
-  Send,
-  Bot,
-  User,
-  Sparkles,
-  Code2,
-  BarChart3,
-  Copy,
-  ThumbsUp,
-  ThumbsDown,
-  RefreshCw,
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
+} from '@/components/ui/sheet';
+import {
+  Send, Bot, Sparkles, Code2, BarChart3, Copy, RefreshCw, BookOpen,
+  Lightbulb, AlertCircle, CheckCircle2, HelpCircle,
 } from 'lucide-react';
-import { channelMetrics, monthlyMetrics } from '@/data/mockData';
-import { CHART_COLORS } from '@/types';
 import { cn } from '@/lib/utils';
-import { motion, AnimatePresence } from 'framer-motion';
+import { CHART_COLORS } from '@/types';
+import { useRegistryMetrics } from '@/hooks/useApi';
+import { useFilters } from '@/contexts/FilterContext';
+import { toApiParams, apiFetch } from '@/api/client';
+import {
+  parseQuestion, EXAMPLE_PROMPTS, CHART_RULES,
+  type ParseResult,
+} from '@/lib/semanticParser';
 
-interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  sql?: string;
-  chart?: 'bar' | 'line';
-  chartData?: { name: string; value: number }[];
-  insight?: string;
-  timestamp: Date;
-}
-
-const EXAMPLE_PROMPTS = [
-  'Which channel has the highest clip yield?',
-  'Show me monthly video processing trend',
-  'What is the average processing time per team member?',
-  'Compare publish rates across languages',
-];
-
-const MOCK_RESPONSES: Record<string, Omit<Message, 'id' | 'role' | 'timestamp'>> = {
-  'which channel has the highest clip yield?': {
-    content: "YouTube leads with 1,842 clips generated, followed by LinkedIn at 1,204. Here's the full breakdown by channel:",
-    sql: `SELECT channel, SUM(clips_generated) AS total_clips\nFROM fact_video_usage\nGROUP BY channel\nORDER BY 2 DESC;`,
-    chart: 'bar',
-    chartData: channelMetrics.map((c) => ({ name: c.channel, value: c.clipsGenerated })),
-    insight: 'YouTube is 53% higher than the next best channel (LinkedIn). Consider reallocating more content to YouTube-first workflows.',
-  },
-  'show me monthly video processing trend': {
-    content: "Here's the monthly video processing trend over the past year:",
-    sql: `SELECT DATE_TRUNC('month', uploaded_at) AS month,\n       COUNT(*) AS videos_processed\nFROM fact_video_usage\nWHERE uploaded_at >= NOW() - INTERVAL '12 months'\nGROUP BY 1 ORDER BY 1;`,
-    chart: 'line',
-    chartData: monthlyMetrics.map((m) => ({ name: m.month.slice(0, 3), value: m.videosProcessed })),
-    insight: 'Processing volume grew 28% YoY. The trough in August may indicate seasonal content pipeline slowdown.',
-  },
-  'what is the average processing time per team member?': {
-    content: "Here's the average processing time breakdown by team member:",
-    sql: `SELECT user, AVG(processing_time_min) AS avg_min\nFROM fact_video_usage\nGROUP BY user\nORDER BY 2;`,
-    chart: 'bar',
-    chartData: [
-      { name: 'Priya S.', value: 18 },
-      { name: 'Arjun M.', value: 22 },
-      { name: 'Zara K.', value: 16 },
-      { name: 'Arnav R.', value: 25 },
-      { name: 'Divya P.', value: 20 },
-      { name: 'Karan T.', value: 19 },
-    ],
-    insight: 'Zara has the fastest average at 16 min. Arnav may benefit from additional tooling or training to reduce 25 min average.',
-  },
-};
-
-function fallbackResponse(query: string): Omit<Message, 'id' | 'role' | 'timestamp'> {
-  return {
-    content: `I found relevant data for "${query}". Based on the current dataset, here's a summary: the platform processed 1,284 videos this period with a 73% publish rate. For more specific analysis, try one of the example queries above or explore the Query Builder for custom SQL.`,
-    insight: 'No specific pattern detected. Try rephrasing for a more targeted insight.',
-  };
-}
-
-const DarkTooltip: React.FC<any> = ({ active, payload, label }) => {
+const DarkTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-[#1C1C1C] border border-[#27272A] rounded-lg p-2 text-xs">
-      <p className="text-[#71717A]">{label}</p>
-      <p className="text-white font-metric">{payload[0]?.value?.toLocaleString()}</p>
+    <div className="bg-[#161616] border border-[#27272A] rounded-lg px-3 py-2 text-xs shadow-xl">
+      {label && <p className="text-[#71717A] mb-1">{label}</p>}
+      {payload.map((p: any, i: number) => (
+        <div key={i} className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full" style={{ background: p.color || p.fill }} />
+          <span className="text-[#A1A1AA]">{p.name}:</span>
+          <span className="text-white font-medium font-mono">
+            {typeof p.value === 'number' ? p.value.toLocaleString() : p.value}
+          </span>
+        </div>
+      ))}
     </div>
   );
 };
 
-export default function AIAnalyticsPage() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 'welcome',
-      role: 'assistant',
-      content: 'Hello! I\'m your Frammer AI analytics assistant. Ask me anything about your content processing data — I\'ll generate SQL, charts, and insights automatically.',
-      timestamp: new Date(),
-    },
-  ]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+interface QuerySession {
+  id: string;
+  question: string;
+  parseResult: ParseResult;
+  data: unknown[] | null;
+  error: string | null;
+  loading: boolean;
+  timestamp: string;
+}
+
+const CHART_COLORS_LIST = [
+  CHART_COLORS.red, CHART_COLORS.blue, CHART_COLORS.amber,
+  CHART_COLORS.green, CHART_COLORS.purple, CHART_COLORS.cyan,
+];
+
+function ResultChart({ parseResult, data }: { parseResult: ParseResult; data: unknown[] }) {
+  if (!data || data.length === 0) return null;
+
+  const { chartType, metric, dimension } = parseResult;
+  const dimensionKey = dimension ?? 'label';
+  const metricKey   = metric ?? 'value';
+
+  if (chartType === 'line') {
+    return (
+      <ResponsiveContainer width="100%" height={220}>
+        <LineChart data={data as any[]} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#1C1C1C" vertical={false} />
+          <XAxis dataKey="month_label" tick={{ fill: '#71717A', fontSize: 11 }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fill: '#71717A', fontSize: 11 }} axisLine={false} tickLine={false} />
+          <Tooltip content={<DarkTooltip />} />
+          <Line type="monotone" dataKey={metricKey} stroke={CHART_COLORS.red} strokeWidth={2} dot={{ fill: CHART_COLORS.red, r: 3 }} />
+        </LineChart>
+      </ResponsiveContainer>
+    );
+  }
+
+  if (chartType === 'pie') {
+    return (
+      <ResponsiveContainer width="100%" height={220}>
+        <PieChart>
+          <Pie data={data as any[]} dataKey={metricKey} nameKey={dimensionKey} cx="45%" cy="50%" outerRadius={80} paddingAngle={2} strokeWidth={0}>
+            {(data as any[]).map((_, i) => (
+              <Cell key={i} fill={CHART_COLORS_LIST[i % CHART_COLORS_LIST.length]} />
+            ))}
+          </Pie>
+          <Tooltip content={<DarkTooltip />} />
+          <Legend formatter={v => <span style={{ color: '#A1A1AA', fontSize: 11 }}>{v}</span>} />
+        </PieChart>
+      </ResponsiveContainer>
+    );
+  }
+
+  // Default: bar
+  return (
+    <ResponsiveContainer width="100%" height={220}>
+      <BarChart data={data as any[]} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#1C1C1C" vertical={false} />
+        <XAxis dataKey={dimensionKey} tick={{ fill: '#71717A', fontSize: 11 }} axisLine={false} tickLine={false} />
+        <YAxis tick={{ fill: '#71717A', fontSize: 11 }} axisLine={false} tickLine={false} />
+        <Tooltip content={<DarkTooltip />} />
+        <Bar dataKey={metricKey} radius={[3, 3, 0, 0]} maxBarSize={36}>
+          {(data as any[]).map((_, i) => (
+            <Cell key={i} fill={CHART_COLORS_LIST[i % CHART_COLORS_LIST.length]} fillOpacity={0.85} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+function ConfidencePill({ score }: { score: number }) {
+  const color = score >= 70 ? 'bg-green-500/15 text-green-400 border-green-500/30'
+    : score >= 40 ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+    : 'bg-red-500/15 text-red-400 border-red-500/30';
+  return (
+    <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded border', color)}>
+      {score}% confidence
+    </span>
+  );
+}
+
+const AIAnalytics: React.FC = () => {
+  const { filters } = useFilters();
+  const { data: registryMetrics } = useRegistryMetrics();
+
+  const [question, setQuestion]     = useState('');
+  const [sessions, setSessions]     = useState<QuerySession[]>([]);
+  const [showSQL, setShowSQL]       = useState<Record<string, boolean>>({});
+  const inputRef                    = useRef<HTMLInputElement>(null);
+  const bottomRef                   = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [sessions]);
 
-  const sendMessage = async (text: string) => {
-    if (!text.trim() || loading) return;
-    const userMsg: Message = { id: String(Date.now()), role: 'user', content: text.trim(), timestamp: new Date() };
-    setMessages((p) => [...p, userMsg]);
-    setInput('');
-    setLoading(true);
-    await new Promise((r) => setTimeout(r, 1200));
-    const key = text.trim().toLowerCase();
-    const resp = MOCK_RESPONSES[key] ?? fallbackResponse(text);
-    const aiMsg: Message = { id: String(Date.now() + 1), role: 'assistant', timestamp: new Date(), ...resp };
-    setMessages((p) => [...p, aiMsg]);
-    setLoading(false);
+  const executeQuery = async (q: string) => {
+    if (!q.trim()) return;
+    const id          = Date.now().toString();
+    const parseResult = parseQuestion(q, registryMetrics ?? undefined);
+    const qs          = toApiParams(filters);
+
+    const newSession: QuerySession = {
+      id,
+      question: q,
+      parseResult,
+      data: null,
+      error: null,
+      loading: true,
+      timestamp: new Date().toLocaleTimeString(),
+    };
+    setSessions(prev => [...prev, newSession]);
+    setQuestion('');
+
+    try {
+      // Route to correct backend endpoint based on parsed intent
+      let endpoint = '/api/v1/core/kpis';
+      const { metric, dimension, dateRange, filters: extraFilters } = parseResult;
+
+      const params = new URLSearchParams(qs);
+      if (dateRange && dateRange !== 'all') params.set('dateRange', dateRange);
+      for (const [k, v] of Object.entries(extraFilters)) params.set(k, v);
+
+      if (dimension === 'month') {
+        endpoint = `/api/v1/trends/monthly?${params.toString()}`;
+      } else if (dimension === 'channel') {
+        endpoint = metric?.includes('lag') || metric?.includes('processing')
+          ? `/api/v1/funnel-efficiency/lag?${params.toString()}`
+          : `/api/v1/performance/channels?${params.toString()}`;
+      } else if (dimension === 'user' || dimension === 'team_name') {
+        endpoint = `/api/v1/performance/analytics/user-productivity?${params.toString()}`;
+      } else if (dimension === 'client') {
+        endpoint = `/api/v1/performance/clients/summary`;
+      } else if (dimension === 'language') {
+        endpoint = `/api/v1/content/languages?${params.toString()}`;
+      } else if (dimension === 'input_type') {
+        endpoint = `/api/v1/content/input-types?${params.toString()}`;
+      } else if (dimension === 'output_type') {
+        endpoint = `/api/v1/content/output-types?${params.toString()}`;
+      } else if (metric?.includes('dq') || metric?.includes('quality')) {
+        endpoint = `/api/v1/diagnostics/quality/summary`;
+      } else {
+        endpoint = `/api/v1/core/kpis?${params.toString()}`;
+      }
+
+      const raw = await apiFetch<unknown>(endpoint);
+      const data = Array.isArray(raw) ? raw : [raw];
+
+      setSessions(prev => prev.map(s => s.id === id ? { ...s, data, loading: false } : s));
+    } catch (err) {
+      setSessions(prev => prev.map(s => s.id === id ? {
+        ...s,
+        error: err instanceof Error ? err.message : 'Unknown error',
+        loading: false,
+      } : s));
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    executeQuery(question);
   };
 
   return (
-    <DashboardLayout title="AI Analytics" subtitle="Natural language analytics assistant">
-      <div className="space-y-4">
-        <PageHeader title="AI Analytics" subtitle="Ask questions in plain English — get SQL, charts, and insights" />
+    <DashboardLayout title="AI Analytics" subtitle="Ask questions in plain English — powered by semantic query layer">
+      <div className="space-y-4 h-full flex flex-col" style={{ minHeight: 'calc(100vh - 120px)' }}>
 
-        <div className="grid grid-cols-12 gap-4 h-[calc(100vh-220px)]">
-          {/* Chat */}
-          <div className="col-span-12 lg:col-span-8 flex flex-col frammer-card overflow-hidden">
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              <AnimatePresence initial={false}>
-                {messages.map((msg) => (
-                  <motion.div
-                    key={msg.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className={cn('flex gap-3', msg.role === 'user' ? 'flex-row-reverse' : '')}
-                  >
-                    <div className={cn(
-                      'w-7 h-7 rounded-full flex items-center justify-center shrink-0',
-                      msg.role === 'assistant' ? 'bg-frammer-red/15 border border-frammer-red/30' : 'bg-[#27272A]'
-                    )}>
-                      {msg.role === 'assistant' ? <Bot size={13} className="text-frammer-red" /> : <User size={13} className="text-white" />}
-                    </div>
-                    <div className={cn('max-w-[85%] space-y-2', msg.role === 'user' ? 'items-end flex flex-col' : '')}>
-                      <div className={cn(
-                        'rounded-xl px-3.5 py-2.5 text-sm leading-relaxed',
-                        msg.role === 'user' ? 'bg-frammer-red/15 text-white border border-frammer-red/25' : 'bg-[#1C1C1C] text-[#A1A1AA]'
-                      )}>
-                        {msg.content}
-                      </div>
+        <div className="flex items-start justify-between gap-4">
+          <PageHeader
+            title="AI Analytics"
+            subtitle="Semantic query engine — ask anything about your content pipeline"
+            badge={{ label: 'BETA', variant: 'blue' as any }}
+            onDownload={() => {}}
+          />
 
-                      {msg.sql && (
-                        <div className="w-full rounded-lg overflow-hidden border border-[#27272A]">
-                          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0D0D0D] border-b border-[#1C1C1C]">
-                            <Code2 size={11} className="text-[#52525B]" />
-                            <span className="text-[10px] text-[#52525B] uppercase tracking-wider">Generated SQL</span>
-                            <button
-                              onClick={() => navigator.clipboard.writeText(msg.sql!)}
-                              className="ml-auto text-[#3F3F46] hover:text-white"
-                            >
-                              <Copy size={10} />
-                            </button>
-                          </div>
-                          <pre className="p-3 text-[11px] text-[#A1A1AA] font-mono leading-relaxed overflow-x-auto">
-                            <code>{msg.sql}</code>
-                          </pre>
-                        </div>
-                      )}
+          {/* Knowledge base drawer */}
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5 shrink-0 bg-[#111] border-[#1C1C1C]">
+                <BookOpen className="h-3.5 w-3.5" />
+                Knowledge Base
+              </Button>
+            </SheetTrigger>
+            <SheetContent className="w-80 overflow-y-auto">
+              <SheetHeader className="mb-4">
+                <SheetTitle>Knowledge Base</SheetTitle>
+              </SheetHeader>
 
-                      {msg.chart && msg.chartData && (
-                        <div className="w-full rounded-xl bg-[#111111] border border-[#27272A] p-3">
-                          <ResponsiveContainer width="100%" height={160}>
-                            {msg.chart === 'bar' ? (
-                              <BarChart data={msg.chartData} margin={{ left: -20 }}>
-                                <CartesianGrid vertical={false} stroke="#1C1C1C" />
-                                <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#52525B' }} axisLine={false} tickLine={false} />
-                                <YAxis tick={{ fontSize: 10, fill: '#52525B' }} axisLine={false} tickLine={false} />
-                                <Tooltip content={<DarkTooltip />} />
-                                <Bar dataKey="value" fill={CHART_COLORS.red} radius={[3, 3, 0, 0]} />
-                              </BarChart>
-                            ) : (
-                              <LineChart data={msg.chartData} margin={{ left: -20 }}>
-                                <CartesianGrid vertical={false} stroke="#1C1C1C" />
-                                <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#52525B' }} axisLine={false} tickLine={false} />
-                                <YAxis tick={{ fontSize: 10, fill: '#52525B' }} axisLine={false} tickLine={false} />
-                                <Tooltip content={<DarkTooltip />} />
-                                <Line dataKey="value" stroke={CHART_COLORS.blue} strokeWidth={2} dot={false} />
-                              </LineChart>
-                            )}
-                          </ResponsiveContainer>
-                        </div>
-                      )}
-
-                      {msg.insight && (
-                        <div className="flex items-start gap-2 bg-blue-500/8 border border-blue-500/20 rounded-xl px-3 py-2">
-                          <Sparkles size={12} className="text-blue-400 mt-0.5 shrink-0" />
-                          <p className="text-xs text-blue-300">{msg.insight}</p>
-                        </div>
-                      )}
-
-                      {msg.role === 'assistant' && msg.id !== 'welcome' && (
-                        <div className="flex gap-1">
-                          <button className="text-[#3F3F46] hover:text-green-400 transition-colors"><ThumbsUp size={11} /></button>
-                          <button className="text-[#3F3F46] hover:text-red-400 transition-colors"><ThumbsDown size={11} /></button>
-                        </div>
-                      )}
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-
-              {loading && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3">
-                  <div className="w-7 h-7 rounded-full bg-frammer-red/15 border border-frammer-red/30 flex items-center justify-center">
-                    <Bot size={13} className="text-frammer-red" />
-                  </div>
-                  <div className="bg-[#1C1C1C] rounded-xl px-4 py-2.5 flex gap-1.5 items-center">
-                    {[0, 0.15, 0.3].map((d) => (
-                      <motion.div
-                        key={d}
-                        animate={{ opacity: [0.3, 1, 0.3] }}
-                        transition={{ duration: 1, repeat: Infinity, delay: d }}
-                        className="w-1.5 h-1.5 rounded-full bg-frammer-red"
-                      />
+              <div className="space-y-6 text-xs">
+                <div>
+                  <p className="font-semibold text-[#E4E4E7] mb-2">Example Prompts</p>
+                  <div className="space-y-1.5">
+                    {EXAMPLE_PROMPTS.map((p, i) => (
+                      <button
+                        key={i}
+                        className="w-full text-left px-2.5 py-1.5 rounded border border-[#1C1C1C] text-[#A1A1AA] hover:border-[#3a3a3a] hover:text-[#E4E4E7] transition-colors"
+                        onClick={() => { setQuestion(p); inputRef.current?.focus(); }}
+                      >
+                        "{p}"
+                      </button>
                     ))}
                   </div>
-                </motion.div>
-              )}
-
-              <div ref={bottomRef} />
-            </div>
-
-            {/* Input */}
-            <div className="border-t border-[#1C1C1C] p-3">
-              <div className="flex gap-2">
-                <input
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && sendMessage(input)}
-                  placeholder="Ask anything — e.g. 'Which channel has the most clips?'"
-                  className="flex-1 bg-[#1C1C1C] border border-[#3F3F46] rounded-xl px-4 py-2.5 text-sm text-white placeholder-[#3F3F46] outline-none focus:border-frammer-red/50 transition-colors"
-                />
-                <Button
-                  onClick={() => sendMessage(input)}
-                  size="sm"
-                  className="bg-frammer-red hover:bg-frammer-red/90 text-white h-10 w-10 p-0"
-                  disabled={loading}
-                >
-                  <Send size={14} />
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {/* Right: Prompts */}
-          <div className="col-span-12 lg:col-span-4 space-y-3">
-            <div className="frammer-card p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <Sparkles size={14} className="text-frammer-red" />
-                <p className="text-xs text-white font-semibold">Example Prompts</p>
-              </div>
-              <div className="space-y-2">
-                {EXAMPLE_PROMPTS.map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => sendMessage(p)}
-                    className="w-full text-left px-3 py-2.5 rounded-xl bg-[#1C1C1C] hover:bg-[#272727] border border-[#27272A] hover:border-[#3F3F46] text-xs text-[#A1A1AA] hover:text-white transition-all"
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="frammer-card p-4 space-y-3">
-              <p className="text-xs text-[#52525B] uppercase tracking-wider font-semibold">Capabilities</p>
-              {[
-                { icon: <Code2 size={12} />, label: 'Generates SQL automatically' },
-                { icon: <BarChart3 size={12} />, label: 'Renders charts from results' },
-                { icon: <Sparkles size={12} />, label: 'Surfaces actionable insights' },
-                { icon: <RefreshCw size={12} />, label: 'Remembers conversation context' },
-              ].map(({ icon, label }) => (
-                <div key={label} className="flex items-center gap-2.5 text-xs text-[#71717A]">
-                  <span className="text-frammer-red">{icon}</span> {label}
                 </div>
-              ))}
-            </div>
-          </div>
+
+                <div>
+                  <p className="font-semibold text-[#E4E4E7] mb-2">Chart Rules</p>
+                  <div className="space-y-1.5">
+                    {CHART_RULES.map((r, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <BarChart3 className="h-3.5 w-3.5 text-[#52525B] mt-0.5 flex-shrink-0" />
+                        <span className="text-[#71717A]">{r.rule}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {registryMetrics && registryMetrics.length > 0 && (
+                  <div>
+                    <p className="font-semibold text-[#E4E4E7] mb-2">Available Metrics</p>
+                    <div className="space-y-1">
+                      {registryMetrics.slice(0, 20).map((m, i) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <Badge variant="outline" className="text-[9px] font-mono shrink-0">{m.name}</Badge>
+                          <span className="text-[#71717A]">{m.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
+
+        {/* ── Quick prompt chips ──────────────────────────────────────────────── */}
+        <div className="flex flex-wrap gap-1.5">
+          {EXAMPLE_PROMPTS.slice(0, 4).map((p, i) => (
+            <button
+              key={i}
+              className="text-[11px] px-2.5 py-1 rounded border border-[#2a2a2a] text-[#71717A] hover:border-[#3a3a3a] hover:text-[#A1A1AA] transition-colors"
+              onClick={() => executeQuery(p)}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Session results ──────────────────────────────────────────────────── */}
+        <div className="flex-1 space-y-4 overflow-y-auto">
+          {sessions.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="mb-4 rounded-full bg-[#111] p-4">
+                <Sparkles className="h-8 w-8 text-[#52525B]" />
+              </div>
+              <h3 className="text-sm font-semibold text-[#E4E4E7]">Ask your first question</h3>
+              <p className="mt-1 max-w-sm text-xs text-[#52525B]">
+                Type a question in plain English below. The semantic engine will parse it, call the correct backend endpoint, and render the result with an explanation.
+              </p>
+            </div>
+          )}
+
+          {sessions.map(session => (
+            <div key={session.id} className="space-y-3">
+              {/* User question */}
+              <div className="flex items-start gap-2.5 justify-end">
+                <div className="max-w-lg bg-primary/10 border border-primary/20 rounded-xl px-4 py-2.5 text-sm text-[#E4E4E7]">
+                  {session.question}
+                </div>
+              </div>
+
+              {/* AI response */}
+              <div className="flex items-start gap-2.5">
+                <div className="w-7 h-7 rounded-full bg-[#111] border border-[#1C1C1C] flex items-center justify-center flex-shrink-0">
+                  <Bot className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 max-w-3xl space-y-3">
+
+                  {/* Interpretation panel */}
+                  <div className="frammer-card p-4 space-y-3">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Lightbulb className="h-4 w-4 text-amber-400 flex-shrink-0" />
+                      <p className="text-xs text-[#E4E4E7] leading-relaxed flex-1">
+                        {session.parseResult.interpreted}
+                      </p>
+                      <ConfidencePill score={session.parseResult.confidence} />
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 text-[10px]">
+                      {session.parseResult.metric && (
+                        <span className="px-2 py-0.5 rounded bg-[#111] border border-[#1C1C1C] text-[#A1A1AA]">
+                          Metric: <span className="text-white font-mono">{session.parseResult.metricLabel}</span>
+                        </span>
+                      )}
+                      {session.parseResult.dimension && (
+                        <span className="px-2 py-0.5 rounded bg-[#111] border border-[#1C1C1C] text-[#A1A1AA]">
+                          Dimension: <span className="text-white font-mono">{session.parseResult.dimensionLabel}</span>
+                        </span>
+                      )}
+                      {session.parseResult.dateRange !== 'all' && (
+                        <span className="px-2 py-0.5 rounded bg-[#111] border border-[#1C1C1C] text-[#A1A1AA]">
+                          Range: <span className="text-white">{session.parseResult.dateRange}</span>
+                        </span>
+                      )}
+                      <span className="px-2 py-0.5 rounded bg-[#111] border border-[#1C1C1C] text-[#A1A1AA]">
+                        Chart: <span className="text-white">{session.parseResult.chartType}</span>
+                      </span>
+                    </div>
+
+                    {session.parseResult.ambiguities.length > 0 && (
+                      <div className="space-y-1">
+                        {session.parseResult.ambiguities.map((a, i) => (
+                          <div key={i} className="flex items-center gap-2 text-[11px] text-amber-400">
+                            <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                            {a}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {session.parseResult.suggestions.length > 0 && (
+                      <div className="space-y-1">
+                        {session.parseResult.suggestions.map((s, i) => (
+                          <div key={i} className="flex items-center gap-2 text-[11px] text-blue-400">
+                            <HelpCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                            {s}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Result / loading */}
+                  {session.loading && (
+                    <div className="frammer-card p-4 flex items-center gap-2 text-xs text-[#52525B]">
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      Querying backend…
+                    </div>
+                  )}
+
+                  {session.error && (
+                    <div className="frammer-card p-4 text-xs text-red-400 flex items-start gap-2">
+                      <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                      <span>{session.error}</span>
+                    </div>
+                  )}
+
+                  {!session.loading && !session.error && session.data && (
+                    <div className="frammer-card p-4 space-y-3">
+                      {/* Chart */}
+                      {Array.isArray(session.data) && session.data.length > 0 && (
+                        <ResultChart parseResult={session.parseResult} data={session.data} />
+                      )}
+
+                      {/* Result summary */}
+                      {Array.isArray(session.data) && (
+                        <p className="text-[11px] text-[#52525B]">
+                          <CheckCircle2 className="inline h-3 w-3 text-green-400 mr-1" />
+                          {session.data.length} record{session.data.length !== 1 ? 's' : ''} returned
+                        </p>
+                      )}
+
+                      {/* SQL toggle */}
+                      <div className="border-t border-[#1C1C1C] pt-2">
+                        <button
+                          onClick={() => setShowSQL(prev => ({ ...prev, [session.id]: !prev[session.id] }))}
+                          className="text-[11px] text-[#52525B] hover:text-[#A1A1AA] flex items-center gap-1 transition-colors"
+                        >
+                          <Code2 className="h-3.5 w-3.5" />
+                          {showSQL[session.id] ? 'Hide' : 'Show'} logical plan
+                        </button>
+                        {showSQL[session.id] && (
+                          <pre className="mt-2 p-3 rounded bg-[#0a0a0a] border border-[#1C1C1C] text-[10px] text-[#A1A1AA] font-mono overflow-x-auto whitespace-pre-wrap">
+                            {session.parseResult.sql}
+                          </pre>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              </div>
+            </div>
+          ))}
+
+          <div ref={bottomRef} />
+        </div>
+
+        {/* ── Input bar ────────────────────────────────────────────────────────── */}
+        <form onSubmit={handleSubmit} className="flex items-center gap-2 border-t border-[#1C1C1C] pt-4">
+          <Input
+            ref={inputRef}
+            className="flex-1 bg-[#111] border-[#1C1C1C] text-sm"
+            placeholder="Ask anything… e.g. 'Show uploaded videos by channel last 30 days'"
+            value={question}
+            onChange={e => setQuestion(e.target.value)}
+          />
+          <Button
+            type="submit"
+            disabled={!question.trim()}
+            className="gap-1.5 bg-primary text-primary-foreground"
+          >
+            <Send className="h-4 w-4" />
+            Ask
+          </Button>
+        </form>
+
       </div>
     </DashboardLayout>
   );
-}
+};
+
+export default AIAnalytics;

@@ -14,6 +14,9 @@ export interface FilterState {
   teamMember: string;
   inputType: string;
   outputType: string;
+  publishedFlag: 'all' | 'true' | 'false';
+  publishedPlatform: string;
+  billableFlag: 'all' | 'true' | 'false';
   comparison: ComparisonState;
 }
 
@@ -33,6 +36,9 @@ const DEFAULT_FILTERS: FilterState = {
   teamMember: 'all',
   inputType: 'all',
   outputType: 'all',
+  publishedFlag: 'all',
+  publishedPlatform: 'all',
+  billableFlag: 'all',
   comparison: {
     enabled: false,
     type: 'month',
@@ -67,6 +73,9 @@ export const FilterProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (filters.inputType !== 'all') count++;
     if (filters.outputType !== 'all') count++;
     if (filters.dateRange !== 'last_30d') count++;
+    if (filters.publishedFlag !== 'all') count++;
+    if (filters.publishedPlatform !== 'all') count++;
+    if (filters.billableFlag !== 'all') count++;
     return count;
   }, [filters]);
 

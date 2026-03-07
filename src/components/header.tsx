@@ -19,6 +19,8 @@ import {
 import { Bell, Settings, LogOut, User, CalendarRange, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useFilters } from '@/contexts/FilterContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const DATE_RANGES = [
   { value: 'last_7d', label: 'Last 7 days' },
@@ -45,6 +47,18 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
   const { filters, updateFilters } = useFilters();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login', { replace: true });
+  };
+
+  const userEmail = user?.email ?? '';
+  const displayName = user?.user_metadata?.full_name ?? userEmail.split('@')[0] ?? 'User';
+  const avatarUrl = user?.user_metadata?.avatar_url ?? '';
+  const initials = displayName.slice(0, 2).toUpperCase();
 
   return (
     <header className="sticky top-0 z-30 border-b border-[#1C1C1C] bg-[#0A0A0A]/90 backdrop-blur-sm">
@@ -120,14 +134,14 @@ export const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-white/5 transition-colors">
                 <Avatar className="h-7 w-7 ring-1 ring-[#27272A]">
-                  <AvatarImage src="" />
+                  <AvatarImage src={avatarUrl} />
                   <AvatarFallback className="bg-frammer-red text-white text-xs font-bold">
-                    FA
+                    {initials}
                   </AvatarFallback>
                 </Avatar>
                 <div className="hidden sm:flex flex-col items-start">
-                  <span className="text-xs font-medium text-white leading-none">Frammer AI</span>
-                  <span className="text-[10px] text-[#71717A] leading-none mt-0.5">Admin</span>
+                  <span className="text-xs font-medium text-white leading-none">{displayName}</span>
+                  <span className="text-[10px] text-[#71717A] leading-none mt-0.5 max-w-[120px] truncate">{userEmail}</span>
                 </div>
                 <ChevronDown className="w-3 h-3 text-[#71717A] ml-0.5" />
               </button>
@@ -142,7 +156,10 @@ export const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
                 <Settings className="w-3.5 h-3.5 mr-2" /> Settings
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-[#27272A]" />
-              <DropdownMenuItem className="text-sm text-red-400 hover:text-red-300 focus:text-red-300 focus:bg-red-900/20 cursor-pointer">
+              <DropdownMenuItem
+                onClick={handleSignOut}
+                className="text-sm text-red-400 hover:text-red-300 focus:text-red-300 focus:bg-red-900/20 cursor-pointer"
+              >
                 <LogOut className="w-3.5 h-3.5 mr-2" /> Sign out
               </DropdownMenuItem>
             </DropdownMenuContent>

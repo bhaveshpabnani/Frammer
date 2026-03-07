@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { DashboardLayout } from '@/components/dashboard-layout';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
@@ -7,12 +7,18 @@ import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { FileText, Download, Printer, ChevronRight, TrendingUp, Clock, Video } from 'lucide-react';
-import { channelMetrics, monthlyMetrics, teamMetrics, languageData } from '@/data/mockData';
+import { FileText, Download, Printer, ChevronRight, TrendingUp, Clock, Video, BookOpen } from 'lucide-react';
 import { CHART_COLORS } from '@/types';
 import { cn } from '@/lib/utils';
+import {
+  useKpis, useMonthly, useChannels, useLanguages, useUsers,
+  useQualityRules, useRegistryMetrics,
+} from '@/hooks/useApi';
+import { useFilters } from '@/contexts/FilterContext';
+import { apiFetchWithMeta } from '@/api/client';
+import type { ResponseMetadata } from '@/api/types';
 
-const TABS = ['Executive Summary', 'Trends', 'Channel', 'Language', 'Team', 'Presentation'] as const;
+const TABS = ['Executive Summary', 'Trends', 'Channel', 'Language', 'Team', 'Metric Appendix'] as const;
 type Tab = typeof TABS[number];
 
 const DarkTooltip: React.FC<any> = ({ active, payload, label }) => {
@@ -25,189 +31,324 @@ const DarkTooltip: React.FC<any> = ({ active, payload, label }) => {
   );
 };
 
-const COLORS = Object.values(CHART_COLORS);
+function MetaFooter({ meta }: { meta?: ResponseMetadata | null }) {
+  if (!meta) return null;
+  return (
+    <div className="mt-4 pt-3 border-t border-[#1C1C1C] text-[10px] text-[#52525B] space-y-1">
+      <p>Generated at: {new Date(meta.generated_at).toLocaleString()}</p>
+      <p>Source grain: {meta.source_grain}</p>
+      {meta.metric_definitions_used.length > 0 && (
+        <p>Metrics: {meta.metric_definitions_used.join(', ')}</p>
+      )}
+      {meta.caveats.length > 0 && (
+        <p>Caveats: {meta.caveats.join(' · ')}</p>
+      )}
+    </div>
+  );
+}
 
-const KPI_HIGHLIGHTS = [
-  { label: 'Videos Processed', value: '1,284', delta: '+12%', positive: true },
-  { label: 'Clips Generated', value: '4,621', delta: '+18%', positive: true },
-  { label: 'Avg Processing Time', value: '19 min', delta: '-8%', positive: true },
-  { label: 'Publish Rate', value: '73%', delta: '+3pp', positive: true },
-];
+const Reports: React.FC = () => {
+  const [activeTab, setActiveTab]         = useState<Tab>('Executive Summary');
+  const { filters }                       = useFilters();
 
-export default function ReportsPage() {
-  const [activeTab, setActiveTab] = useState<Tab>('Executive Summary');
+  const { data: kpis }                    = useKpis();
+  const { data: monthlyData = [] }        = useMonthly();
+  const { data: channelData = [] }        = useChannels();
+  const { data: languageData = [] }       = useLanguages();
+  const { data: userData = [] }           = useUsers();
+  const { data: qualityRules }            = useQualityRules();
+  const { data: registryMetrics = [] }    = useRegistryMetrics();
+
+  // Collect metadata from last fetch
+  const [sectionMeta, setSectionMeta]     = useState<Record<string, ResponseMetadata>>({});
+
+  const activeFiltersText = useMemo(() => {
+    const parts: string[] = [];
+    if (filters.client  !== 'all') parts.push(`Client: ${filters.client}`);
+    if (filters.channel !== 'all') parts.push(`Channel: ${filters.channel}`);
+    if (filters.dateRange !== 'all') parts.push(`Period: ${filters.dateRange}`);
+    return parts.length > 0 ? parts.join(' · ') : 'All data (no filters applied)';
+  }, [filters]);
+
+  const trendData = monthlyData.map(m => ({
+    month:    m.month,
+    Uploaded: m.videosProcessed,
+    Published: (m as any).videosPublished ?? 0,
+  }));
+
+  const channelBarData = channelData.slice(0, 8).map(c => ({
+    channel: c.channel,
+    Videos: c.videosProcessed,
+    Hours:  Math.round(c.totalDurationHours),
+  }));
+
+  const langPieData = languageData.slice(0, 6).map(l => ({
+    language: l.language,
+    count: l.count,
+  }));
+
+  const PIE_COLORS = [
+    CHART_COLORS.red, CHART_COLORS.blue, CHART_COLORS.amber,
+    CHART_COLORS.green, CHART_COLORS.purple, CHART_COLORS.cyan,
+  ];
 
   const handlePrint = () => window.print();
 
-  const handleCSV = () => {
-    const rows = [
-      ['Month', 'Videos Processed', 'Clips Generated', 'Hours Processed'],
-      ...monthlyMetrics.map((m) => [m.month, m.videosProcessed, m.clipsGenerated, m.hoursProcessed]),
-    ];
-    const csv = rows.map((r) => r.map((c) => `"${c}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'frammer-report.csv';
+  const handleExportJSON = () => {
+    const payload = {
+      generated_at: new Date().toISOString(),
+      filters_applied: {
+        client: filters.client,
+        channel: filters.channel,
+        dateRange: filters.dateRange,
+        language: filters.language,
+      },
+      insight_summary: {
+        total_uploaded: kpis?.totalVideos ?? 0,
+        total_published: 0,
+        publish_rate: kpis?.publishRate ?? 0,
+        dq_score: kpis?.dqScore ?? null,
+        mom_growth: kpis?.momGrowth ?? 0,
+      },
+      metric_appendix: registryMetrics.slice(0, 20).map(m => ({
+        name: m.name,
+        label: m.label,
+        caveats: m.caveats,
+      })),
+      data: {
+        monthly: monthlyData,
+        channels: channelData,
+        languages: languageData,
+        users: userData.slice(0, 20),
+      },
+      section_metadata: sectionMeta,
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `frammer-report-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   return (
-    <DashboardLayout title="Reports" subtitle="Generate and export analytics reports">
-      <div className="space-y-5">
-        <div className="flex items-center justify-between">
-          <PageHeader title="Reports" subtitle="Frammer Analytics — March 2025 to February 2026" />
-          <div className="flex gap-2">
-            <Button onClick={handleCSV} variant="outline" size="sm" className="text-xs border-[#27272A] text-[#A1A1AA] hover:text-white">
-              <Download size={12} className="mr-1.5" /> Export CSV
+    <DashboardLayout title="Reports" subtitle="Metadata-driven report generation across all metrics">
+      <div className="space-y-6 animate-fade-in">
+
+        <div className="flex items-start justify-between gap-4">
+          <PageHeader
+            title="Reports"
+            subtitle="Structured report with filter context, metric appendix, and export"
+            badge={{ label: 'LIVE', variant: 'blue' as any }}
+            onDownload={handleExportJSON}
+          />
+          <div className="flex gap-2 shrink-0">
+            <Button variant="outline" size="sm" className="gap-1.5 bg-[#111] border-[#1C1C1C]" onClick={handlePrint}>
+              <Printer className="h-4 w-4" />
+              Print
             </Button>
-            <Button onClick={handlePrint} size="sm" className="bg-frammer-red hover:bg-frammer-red/90 text-white text-xs">
-              <Printer size={12} className="mr-1.5" /> Print / PDF
+            <Button variant="outline" size="sm" className="gap-1.5 bg-[#111] border-[#1C1C1C]" onClick={handleExportJSON}>
+              <Download className="h-4 w-4" />
+              Export JSON
             </Button>
           </div>
         </div>
 
+        {/* Report header metadata */}
+        <div className="frammer-card p-4 text-xs space-y-1">
+          <div className="flex items-center gap-2 text-[#71717A] mb-2">
+            <FileText className="h-4 w-4" />
+            <span className="font-semibold text-[#A1A1AA]">Report Context</span>
+          </div>
+          <p><span className="text-[#52525B]">Generated:</span> <span className="text-[#A1A1AA]">{new Date().toLocaleString()}</span></p>
+          <p><span className="text-[#52525B]">Filters:</span> <span className="text-[#A1A1AA]">{activeFiltersText}</span></p>
+          {kpis?.dqScore != null && (
+            <p><span className="text-[#52525B]">Data Quality Score:</span> <span className={cn('font-semibold', kpis.dqScore >= 80 ? 'text-green-400' : kpis.dqScore >= 60 ? 'text-amber-400' : 'text-red-400')}>{kpis.dqScore.toFixed(0)}/100</span></p>
+          )}
+          {qualityRules?.critical_count != null && qualityRules.critical_count > 0 && (
+            <p><span className="text-[#52525B]">Critical DQ Rules:</span> <span className="text-red-400 font-semibold">{qualityRules.critical_count} failing</span></p>
+          )}
+        </div>
+
         {/* Tabs */}
-        <div className="flex gap-1 flex-wrap">
-          {TABS.map((t) => (
-            <button key={t} onClick={() => setActiveTab(t)} className={cn('px-3 py-1.5 rounded-full text-xs transition-all', activeTab === t ? 'bg-frammer-red/15 text-white border border-frammer-red/30' : 'text-[#52525B] hover:text-white')}>
-              {t}
+        <div className="flex gap-1 flex-wrap border-b border-[#1C1C1C] pb-0">
+          {TABS.map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={cn(
+                'px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors',
+                activeTab === tab
+                  ? 'border-primary text-[#E4E4E7]'
+                  : 'border-transparent text-[#71717A] hover:text-[#A1A1AA]',
+              )}
+            >
+              {tab}
             </button>
           ))}
         </div>
 
+        {/* ── Executive Summary ─────────────────────────────────────────────── */}
         {activeTab === 'Executive Summary' && (
           <div className="space-y-4">
-            {/* KPIs */}
+            <h3 className="text-sm font-semibold text-[#E4E4E7]">Key Performance Indicators</h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {KPI_HIGHLIGHTS.map((kpi) => (
-                <div key={kpi.label} className="frammer-card p-4">
-                  <p className="text-xs text-[#52525B] mb-2">{kpi.label}</p>
-                  <p className="text-2xl font-metric text-white">{kpi.value}</p>
-                  <Badge variant="outline" className={cn('mt-1 text-[10px] border px-1.5', kpi.positive ? 'text-green-400 border-green-500/30' : 'text-red-400 border-red-500/30')}>
-                    {kpi.delta}
-                  </Badge>
+              {[
+                { label: 'Videos Uploaded',    value: kpis?.totalVideos?.toLocaleString() ?? '—',   icon: <Video size={14} /> },
+                { label: 'Publish Rate',        value: kpis?.publishRate != null ? `${(kpis.publishRate * 100).toFixed(1)}%` : '—', icon: <TrendingUp size={14} /> },
+                { label: 'Hours Processed',     value: kpis?.totalHoursProcessed != null ? `${kpis.totalHoursProcessed.toFixed(0)}h` : '—', icon: <Clock size={14} /> },
+                { label: 'MoM Growth',          value: kpis?.momGrowth != null ? `${kpis.momGrowth >= 0 ? '+' : ''}${kpis.momGrowth.toFixed(1)}%` : '—', icon: <TrendingUp size={14} /> },
+              ].map((item, i) => (
+                <div key={i} className="frammer-card p-4">
+                  <div className="flex items-center gap-2 text-[#71717A] mb-2">{item.icon} <span className="text-[10px] uppercase tracking-wide">{item.label}</span></div>
+                  <p className="font-metric text-xl text-[#E4E4E7]">{item.value}</p>
                 </div>
               ))}
             </div>
 
-            {/* Executive paragraph */}
-            <div className="frammer-card p-5 space-y-3">
-              <div className="flex items-center gap-2">
-                <FileText size={14} className="text-frammer-red" />
-                <p className="text-sm font-semibold text-white">Executive Summary</p>
-              </div>
-              <p className="text-sm text-[#71717A] leading-relaxed">
-                Frammer AI processed <strong className="text-white">1,284 videos</strong> from March 2025 to February 2026, generating{' '}
-                <strong className="text-white">4,621 clips</strong> across 6 channels. Overall publishing throughput improved by{' '}
-                <strong className="text-green-400">18%</strong> year-over-year, while average per-video processing time decreased by{' '}
-                <strong className="text-green-400">8%</strong> to 19 minutes.
-              </p>
-              <p className="text-sm text-[#71717A] leading-relaxed">
-                YouTube and LinkedIn remain the highest-volume channels. English-language content accounts for 42% of total volume. 
-                The team maintained a <strong className="text-white">73% publish rate</strong>, with 3 percentage points of improvement vs. the prior period.
-              </p>
+            <div className="frammer-card p-4">
+              <h4 className="text-xs font-semibold text-[#A1A1AA] mb-3">Insight Summary</h4>
+              <ul className="space-y-1.5 text-xs text-[#A1A1AA]">
+                <li>• Total uploaded videos: <strong className="text-[#E4E4E7]">{kpis?.totalVideos?.toLocaleString() ?? '—'}</strong></li>
+                <li>• Active channels: <strong className="text-[#E4E4E7]">{kpis?.activeChannels ?? '—'}</strong> · Active clients: <strong className="text-[#E4E4E7]">{kpis?.activeClients ?? '—'}</strong></li>
+                <li>• Clips generated per video: <strong className="text-[#E4E4E7]">{kpis?.avgClipsPerVideo ?? '—'}×</strong></li>
+                <li>• Top channel by volume: <strong className="text-[#E4E4E7]">{kpis?.topChannel ?? '—'}</strong></li>
+                <li>• Top language: <strong className="text-[#E4E4E7]">{kpis?.topLanguage ?? '—'}</strong></li>
+              </ul>
             </div>
           </div>
         )}
 
+        {/* ── Trends ────────────────────────────────────────────────────────── */}
         {activeTab === 'Trends' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="frammer-card p-4 space-y-3">
-              <p className="text-xs text-[#52525B] uppercase tracking-wider font-semibold flex items-center gap-2"><TrendingUp size={12} /> Monthly Videos Processed</p>
-              <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={monthlyMetrics}>
-                  <CartesianGrid vertical={false} stroke="#27272A" strokeDasharray="3 3" />
-                  <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#52525B' }} axisLine={false} tickLine={false} tickFormatter={(v) => v.slice(0, 3)} />
-                  <YAxis tick={{ fontSize: 10, fill: '#52525B' }} axisLine={false} tickLine={false} width={35} />
-                  <Tooltip content={<DarkTooltip />} />
-                  <Line dataKey="videosProcessed" stroke={CHART_COLORS.red} strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="frammer-card p-4 space-y-3">
-              <p className="text-xs text-[#52525B] uppercase tracking-wider font-semibold flex items-center gap-2"><Clock size={12} /> Avg Processing Time (min)</p>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={monthlyMetrics}>
-                  <CartesianGrid vertical={false} stroke="#27272A" strokeDasharray="3 3" />
-                  <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#52525B' }} axisLine={false} tickLine={false} tickFormatter={(v) => v.slice(0, 3)} />
-                  <YAxis tick={{ fontSize: 10, fill: '#52525B' }} axisLine={false} tickLine={false} width={35} />
-                  <Tooltip content={<DarkTooltip />} />
-                  <Bar dataKey="avgProcessingTimeMin" fill={CHART_COLORS.blue} radius={[3, 3, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+          <div className="frammer-card p-4">
+            <h3 className="text-sm font-semibold text-[#E4E4E7] mb-4">Monthly Pipeline Trend</h3>
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={trendData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1C1C1C" vertical={false} />
+                <XAxis dataKey="month" tick={{ fill: '#71717A', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#71717A', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <Tooltip content={<DarkTooltip />} />
+                <Line type="monotone" dataKey="Uploaded" stroke={CHART_COLORS.red} strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="Published" stroke={CHART_COLORS.green} strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
         )}
 
+        {/* ── Channel ───────────────────────────────────────────────────────── */}
         {activeTab === 'Channel' && (
-          <div className="frammer-card p-4 space-y-3">
-            <p className="text-xs text-[#52525B] uppercase tracking-wider font-semibold">Clips Generated by Channel</p>
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={channelMetrics} margin={{ left: 0 }}>
-                <CartesianGrid vertical={false} stroke="#27272A" strokeDasharray="3 3" />
-                <XAxis dataKey="channel" tick={{ fontSize: 11, fill: '#52525B' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: '#52525B' }} axisLine={false} tickLine={false} width={40} />
+          <div className="frammer-card p-4">
+            <h3 className="text-sm font-semibold text-[#E4E4E7] mb-4">Channel Volume Breakdown</h3>
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={channelBarData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1C1C1C" vertical={false} />
+                <XAxis dataKey="channel" tick={{ fill: '#71717A', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#71717A', fontSize: 11 }} axisLine={false} tickLine={false} />
                 <Tooltip content={<DarkTooltip />} />
-                <Bar dataKey="clipsGenerated" radius={[4, 4, 0, 0]}>
-                  {channelMetrics.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} fillOpacity={0.85} />)}
-                </Bar>
+                <Bar dataKey="Videos" fill={CHART_COLORS.red} radius={[3, 3, 0, 0]} maxBarSize={28} />
+                <Bar dataKey="Hours" fill={CHART_COLORS.blue} radius={[3, 3, 0, 0]} maxBarSize={28} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         )}
 
+        {/* ── Language ──────────────────────────────────────────────────────── */}
         {activeTab === 'Language' && (
-          <div className="frammer-card p-4 space-y-3">
-            <p className="text-xs text-[#52525B] uppercase tracking-wider font-semibold">Content Volume by Language</p>
-            <ResponsiveContainer width="100%" height={220}>
+          <div className="frammer-card p-4">
+            <h3 className="text-sm font-semibold text-[#E4E4E7] mb-4">Language Distribution</h3>
+            <ResponsiveContainer width="100%" height={260}>
               <PieChart>
-                <Pie data={languageData} dataKey="count" nameKey="language" innerRadius={50} outerRadius={90} paddingAngle={2} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
-                  {languageData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                <Pie data={langPieData} dataKey="count" nameKey="language" cx="45%" cy="50%" outerRadius={90} paddingAngle={2} strokeWidth={0}>
+                  {langPieData.map((_, i) => (
+                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                  ))}
                 </Pie>
                 <Tooltip content={<DarkTooltip />} />
               </PieChart>
             </ResponsiveContainer>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {langPieData.map((l, i) => (
+                <div key={i} className="flex items-center gap-2 text-xs">
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
+                  <span className="text-[#A1A1AA] truncate">{l.language}</span>
+                  <span className="font-mono text-[#71717A] ml-auto">{l.count.toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
+        {/* ── Team ──────────────────────────────────────────────────────────── */}
         {activeTab === 'Team' && (
           <div className="frammer-card overflow-hidden">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-[#1C1C1C] bg-[#0D0D0D]">
-                  {['Team Member', 'Videos Processed', 'Clips Generated', 'Avg Time (min)'].map((h) => (
-                    <th key={h} className="text-left text-[#52525B] uppercase tracking-wider py-2.5 px-4 font-semibold">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {teamMetrics.map((m) => (
-                  <tr key={m.name} className="border-b border-[#1C1C1C] hover:bg-white/2">
-                    <td className="px-4 py-2.5 text-white">{m.name}</td>
-                    <td className="px-4 py-2.5 text-[#A1A1AA] font-metric">{m.videosProcessed}</td>
-                    <td className="px-4 py-2.5 text-[#A1A1AA] font-metric">{m.clipsGenerated}</td>
-                    <td className="px-4 py-2.5 text-[#A1A1AA] font-metric">{m.avgProcessingTimeMin}</td>
+            <div className="px-5 py-4 border-b border-[#1C1C1C]">
+              <h3 className="text-sm font-semibold text-[#E4E4E7]">Team Member Performance</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-[#1C1C1C]">
+                    {['Name', 'Team', 'Videos', 'Avg Duration'].map(h => (
+                      <th key={h} className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-[#52525B]">{h}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {userData.slice(0, 20).map((u, i) => (
+                    <tr key={i} className="border-b border-[#0F0F0F] hover:bg-white/[0.02]">
+                      <td className="px-5 py-2.5 text-[#E4E4E7]">{u.name}</td>
+                      <td className="px-5 py-2.5 text-[#71717A]">{u.teamName || '—'}</td>
+                      <td className="px-5 py-2.5 font-mono text-[#A1A1AA]">{u.videosProcessed.toLocaleString()}</td>
+                      <td className="px-5 py-2.5 font-mono text-[#A1A1AA]">{u.avgProcessingTimeMin.toFixed(1)} min</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
-        {activeTab === 'Presentation' && (
+        {/* ── Metric Appendix ────────────────────────────────────────────────── */}
+        {activeTab === 'Metric Appendix' && (
           <div className="space-y-3">
-            <p className="text-xs text-[#52525B]">Presentation-ready slides — click <strong className="text-white">Print / PDF</strong> to export.</p>
-            {['Executive Summary', 'Monthly Trends', 'Channel Performance', 'Team Highlights'].map((slide, i) => (
-              <div key={slide} className="frammer-card p-4 flex items-center gap-4">
-                <div className="w-8 h-8 rounded-lg bg-frammer-red/15 border border-frammer-red/30 flex items-center justify-center text-xs font-metric text-frammer-red">{i + 1}</div>
-                <p className="text-sm text-white">{slide}</p>
-                <ChevronRight size={14} className="ml-auto text-[#52525B]" />
-              </div>
-            ))}
+            <div className="flex items-center gap-2 text-xs text-[#71717A] mb-2">
+              <BookOpen className="h-4 w-4" />
+              <span>Definitions sourced from the metric registry. Used metrics are highlighted.</span>
+            </div>
+            {registryMetrics.length === 0 ? (
+              <p className="text-xs text-[#52525B]">Registry not loaded — check backend connection.</p>
+            ) : (
+              registryMetrics.slice(0, 30).map((m, i) => (
+                <div key={i} className="frammer-card p-4">
+                  <div className="flex items-start justify-between gap-4 mb-1">
+                    <div>
+                      <span className="font-mono text-[11px] text-[#52525B] mr-2">{m.name}</span>
+                      <span className="text-sm font-medium text-[#E4E4E7]">{m.label}</span>
+                    </div>
+                    {m.is_proxy && <Badge variant="outline" className="text-[10px] shrink-0">proxy</Badge>}
+                  </div>
+                  {m.formula_sql && (
+                    <pre className="text-[10px] text-[#71717A] font-mono bg-[#0a0a0a] p-2 rounded mt-2 overflow-x-auto whitespace-pre-wrap">
+                      {m.formula_sql}
+                    </pre>
+                  )}
+                  {m.caveats.length > 0 && (
+                    <p className="text-[10px] text-[#52525B] mt-1.5">⚠ {m.caveats.join(' · ')}</p>
+                  )}
+                </div>
+              ))
+            )}
           </div>
         )}
+
       </div>
     </DashboardLayout>
   );
-}
+};
+
+export default Reports;
