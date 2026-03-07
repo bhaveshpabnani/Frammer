@@ -399,6 +399,7 @@ export interface GrowthResponseRaw {
   mom_duration_pct: number | null;
   rolling_30d_uploaded: number;
   rolling_30d_published: number;
+  rolling_30d_prev_uploaded: number;
 }
 
 export interface GrowthPeriod {

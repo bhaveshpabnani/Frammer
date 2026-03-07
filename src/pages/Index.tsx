@@ -103,8 +103,11 @@ const Overview: React.FC = () => {
   const published = findStage('published')?.count ?? Math.round(uploaded * ((kpis as any).publishRate ?? 0));
   // Prefer dedicated backlog endpoint
   const backlog   = backlogData?.total_backlog ?? Math.max(0, processed - published);
-  const oldestDays = backlogData?.oldest_days ?? agingData?.oldest_item
-    ? Math.ceil((Date.now() - (agingData!.oldest_item!.uploaded_at ?? Date.now())) / 86_400_000) : null;
+  const oldestDays = backlogData?.oldest_days != null
+    ? backlogData.oldest_days
+    : agingData?.oldest_item
+    ? Math.ceil((Date.now() - (agingData.oldest_item.uploaded_at ?? Date.now())) / 86_400_000)
+    : null;
 
   const processingRate        = uploaded  > 0 ? (processed / uploaded)  * 100 : 0;
   const publishConversionRate = processed > 0 ? (published / processed) * 100 : 0;
