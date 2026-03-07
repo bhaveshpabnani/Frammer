@@ -11,7 +11,7 @@ interface StatsCardProps {
     label?: string;
   };
   icon?: React.ReactNode;
-  accentColor?: 'red' | 'blue' | 'green' | 'amber';
+  accentColor?: 'red' | 'blue' | 'green' | 'amber' | 'purple';
   className?: string;
   loading?: boolean;
 }
@@ -40,6 +40,12 @@ const accentMap = {
     trend_pos: 'text-green-400',
     trend_neg: 'text-red-400',
     glow: 'hover:shadow-[0_0_24px_rgba(245,158,11,0.12)]',
+  },
+  purple: {
+    icon: 'text-purple-400 bg-purple-500/10',
+    trend_pos: 'text-green-400',
+    trend_neg: 'text-red-400',
+    glow: 'hover:shadow-[0_0_24px_rgba(168,85,247,0.12)]',
   },
 };
 

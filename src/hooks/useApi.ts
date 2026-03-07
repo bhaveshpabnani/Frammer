@@ -375,8 +375,15 @@ export function useGrowth() {
       previous: d.previous ? _normGrowthPeriod(d.previous) : null,
       mom_growth_pct: d.mom_uploaded_pct ?? null,
       rolling_30d: d.rolling_30d_uploaded,
-      rolling_30d_prev: 0,
-      rolling_30d_growth_pct: null as number | null,
+      rolling_30d_prev: d.rolling_30d_prev_uploaded ?? 0,
+      rolling_30d_growth_pct:
+        d.rolling_30d_prev_uploaded && d.rolling_30d_prev_uploaded > 0
+          ? Math.round(
+              ((d.rolling_30d_uploaded - d.rolling_30d_prev_uploaded) /
+                d.rolling_30d_prev_uploaded) *
+                1000,
+            ) / 10
+          : null,
     }),
     staleTime: 30_000,
   });
