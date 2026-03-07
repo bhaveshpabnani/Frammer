@@ -364,6 +364,7 @@ class GrowthResponse(BaseModel):
     mom_duration_pct: Optional[float] = None
     rolling_30d_uploaded: int = 0
     rolling_30d_published: int = 0
+    rolling_30d_prev_uploaded: int = 0
 
 
 # ── Lag / Time Efficiency ──────────────────────────────────────────────────────

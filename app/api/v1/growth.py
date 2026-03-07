@@ -127,12 +127,24 @@ async def get_growth(
     def _pct(curr: int, prev: int) -> Optional[float]:
         return round((curr - prev) / prev * 100, 1) if prev else None
 
-    # Rolling 30-day counts (no month boundary)
+    # Rolling 30-day counts anchored on the latest uploaded_at in the DB
+    # (not NOW()) so that historical datasets produce meaningful numbers.
     rolling_sql = text("""
+        WITH anchor AS (
+            SELECT MAX(uploaded_at) AS max_ts FROM fact_video
+        )
         SELECT
-            COUNT(*) FILTER (WHERE uploaded_at >= EXTRACT(EPOCH FROM NOW() - INTERVAL '30 days')::int)  AS r30_uploaded,
-            SUM(CASE WHEN published AND uploaded_at >= EXTRACT(EPOCH FROM NOW() - INTERVAL '30 days')::int THEN 1 ELSE 0 END) AS r30_published
-        FROM fact_video
+            COUNT(*) FILTER (
+                WHERE fv.uploaded_at > a.max_ts - 30 * 86400
+            ) AS r30_uploaded,
+            SUM(CASE WHEN fv.published
+                      AND fv.uploaded_at > a.max_ts - 30 * 86400
+                     THEN 1 ELSE 0 END) AS r30_published,
+            COUNT(*) FILTER (
+                WHERE fv.uploaded_at > a.max_ts - 60 * 86400
+                  AND fv.uploaded_at <= a.max_ts - 30 * 86400
+            ) AS r30_prev_uploaded
+        FROM fact_video fv, anchor a
     """)
     rolling_row = (await db.execute(rolling_sql)).mappings().one()
 
@@ -148,6 +160,7 @@ async def get_growth(
         ),
         rolling_30d_uploaded=int(rolling_row["r30_uploaded"] or 0),
         rolling_30d_published=int(rolling_row["r30_published"] or 0),
+        rolling_30d_prev_uploaded=int(rolling_row["r30_prev_uploaded"] or 0),
     )
     return wrap(data, f,
                 metrics=["total_uploaded", "total_published", "mom_growth_pct"],

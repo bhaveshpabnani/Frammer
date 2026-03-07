@@ -71,7 +71,7 @@ async def channel_health(
             m.med_conv,
             ROUND(
                 (PERCENT_RANK() OVER (ORDER BY ch.total_uploaded) * 50
-               + ch.pub_pct * 0.5), 1
+               + ch.pub_pct * 0.5)::numeric, 1
             ) AS health_score
         FROM ch_stats ch, medians m
         ORDER BY health_score DESC
@@ -135,7 +135,7 @@ async def user_productivity(
             COUNT(fv.id)                                                    AS total_uploaded,
             SUM(CASE WHEN fv.published THEN 1 ELSE 0 END)                  AS total_published,
             CASE WHEN COUNT(fv.id) > 0
-                 THEN ROUND(SUM(CASE WHEN fv.published THEN 1.0 ELSE 0 END) / COUNT(fv.id) * 100, 1)
+                 THEN ROUND((SUM(CASE WHEN fv.published THEN 1.0 ELSE 0 END) / COUNT(fv.id) * 100)::numeric, 1)
                  ELSE 0 END                                                 AS pub_pct,
             COALESCE(SUM(fv.uploaded_duration_sec),  0) / 3600.0           AS uploaded_hrs,
             CASE WHEN COUNT(fv.id) > 0

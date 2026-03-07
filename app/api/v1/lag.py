@@ -30,41 +30,41 @@ def _lag_select_cols(prefix: str = "fv") -> str:
     """
     return f"""
         COUNT(*) AS cnt,
-        ROUND(AVG(COALESCE(
+        ROUND((AVG(COALESCE(
             {prefix}.processing_lag_sec,
             CASE WHEN {prefix}.processed_at IS NOT NULL AND {prefix}.uploaded_at IS NOT NULL
                  THEN {prefix}.processed_at - {prefix}.uploaded_at ELSE NULL END
-        )) / 60.0, 1)   AS avg_proc_lag_min,
-        ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY COALESCE(
+        )) / 60.0)::numeric, 1)   AS avg_proc_lag_min,
+        ROUND((PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY COALESCE(
             {prefix}.processing_lag_sec,
             CASE WHEN {prefix}.processed_at IS NOT NULL AND {prefix}.uploaded_at IS NOT NULL
                  THEN {prefix}.processed_at - {prefix}.uploaded_at ELSE NULL END
-        )) / 60.0, 1)   AS med_proc_lag_min,
-        ROUND(PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY COALESCE(
+        )) / 60.0)::numeric, 1)   AS med_proc_lag_min,
+        ROUND((PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY COALESCE(
             {prefix}.processing_lag_sec,
             CASE WHEN {prefix}.processed_at IS NOT NULL AND {prefix}.uploaded_at IS NOT NULL
                  THEN {prefix}.processed_at - {prefix}.uploaded_at ELSE NULL END
-        )) / 60.0, 1)   AS p90_proc_lag_min,
-        ROUND(AVG(COALESCE(
+        )) / 60.0)::numeric, 1)   AS p90_proc_lag_min,
+        ROUND((AVG(COALESCE(
             {prefix}.publishing_lag_sec,
             CASE WHEN {prefix}.published_at IS NOT NULL AND {prefix}.uploaded_at IS NOT NULL
                  THEN {prefix}.published_at - {prefix}.uploaded_at ELSE NULL END
-        )) / 60.0, 1)   AS avg_pub_lag_min,
-        ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY COALESCE(
+        )) / 60.0)::numeric, 1)   AS avg_pub_lag_min,
+        ROUND((PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY COALESCE(
             {prefix}.publishing_lag_sec,
             CASE WHEN {prefix}.published_at IS NOT NULL AND {prefix}.uploaded_at IS NOT NULL
                  THEN {prefix}.published_at - {prefix}.uploaded_at ELSE NULL END
-        )) / 60.0, 1)   AS med_pub_lag_min,
-        ROUND(PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY COALESCE(
+        )) / 60.0)::numeric, 1)   AS med_pub_lag_min,
+        ROUND((PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY COALESCE(
             {prefix}.publishing_lag_sec,
             CASE WHEN {prefix}.published_at IS NOT NULL AND {prefix}.uploaded_at IS NOT NULL
                  THEN {prefix}.published_at - {prefix}.uploaded_at ELSE NULL END
-        )) / 60.0, 1)   AS p90_pub_lag_min,
-        ROUND(AVG(COALESCE(
+        )) / 60.0)::numeric, 1)   AS p90_pub_lag_min,
+        ROUND((AVG(COALESCE(
             {prefix}.total_cycle_lag_sec,
             CASE WHEN {prefix}.published_at IS NOT NULL AND {prefix}.uploaded_at IS NOT NULL
                  THEN {prefix}.published_at - {prefix}.uploaded_at ELSE NULL END
-        )) / 60.0, 1)   AS avg_cycle_lag_min
+        )) / 60.0)::numeric, 1)   AS avg_cycle_lag_min
     """
 
 
