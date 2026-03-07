@@ -1,16 +1,17 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard-layout';
 import { PageHeader } from '@/components/page-header';
 import { StatsCard } from '@/components/stats-card';
 import { ChartCard } from '@/components/chart-card';
 import {
-  AreaChart, Area, BarChart, Bar,
+  AreaChart, Area, BarChart, Bar, LineChart, Line, Legend,
   ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, Cell,
 } from 'recharts';
 import { Cpu, Clock, TrendingDown, Activity } from 'lucide-react';
-import { monthlyMetrics, durationBuckets } from '@/data/mockData';
+import { monthlyMetrics as mockMonthly, durationBuckets as mockBuckets } from '@/data/mockData';
 import { CHART_COLORS } from '@/types';
 import { CalendarHeatmap } from '@/components/CalendarHeatmap';
+import { useMonthly, useDurationBuckets, useKpis } from '@/hooks/useApi';
 
 const DarkTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
@@ -28,38 +29,43 @@ const DarkTooltip = ({ active, payload, label }: any) => {
   );
 };
 
-// Simulated avg processing time per month (improving over time)
-const processingTrend = monthlyMetrics.map((m, i) => ({
-  month: m.month,
-  avgMinutes: +(34 - i * 0.6).toFixed(1),
-  hoursProcessed: m.hoursProcessed,
-}));
 
-// Simulated queue health (0-100 score)
-const queueHealth = [
-  { date: '01 Feb', queue: 4, throughput: 5.2 },
-  { date: '05 Feb', queue: 7, throughput: 4.8 },
-  { date: '10 Feb', queue: 3, throughput: 5.6 },
-  { date: '15 Feb', queue: 9, throughput: 4.4 },
-  { date: '20 Feb', queue: 5, throughput: 5.1 },
-  { date: '25 Feb', queue: 2, throughput: 5.8 },
-  { date: '28 Feb', queue: 3, throughput: 5.5 },
-];
-
-// Generate 365-day heatmap data from monthly totals (deterministic)
-const dailyHeatmapData = Array.from({ length: 365 }, (_, i) => {
-  const date = new Date('2025-03-01');
-  date.setDate(date.getDate() + i);
-  const seed = Math.sin(i * 127.1) * 0.5 + 0.5;
-  const monthIdx = Math.min(Math.floor(i / 30), monthlyMetrics.length - 1);
-  const baseValue = monthlyMetrics[monthIdx].videosProcessed;
-  return {
-    date: date.toISOString().slice(0, 10),
-    value: Math.round((baseValue / 30) * (0.3 + seed * 1.4)),
-  };
-});
 
 const ProcessingInsights: React.FC = () => {
+  const { data: liveMonthly  } = useMonthly();
+  const { data: liveBuckets  } = useDurationBuckets();
+  const { data: kpis         } = useKpis();
+  const monthlyData     = liveMonthly   ?? mockMonthly;
+  const durationBuckets = liveBuckets   ?? mockBuckets;
+
+  useEffect(() => {
+    if (!liveMonthly) console.warn('[ProcessingInsights] Monthly data unavailable — showing mock fallback');
+    if (!liveBuckets) console.warn('[ProcessingInsights] Duration buckets unavailable — showing mock fallback');
+  }, [liveMonthly, liveBuckets]);
+
+  // Per-bucket max for "Longest Job" proxy
+  const longestBucket = liveBuckets?.at(-1)?.range ?? '4–8 hrs';
+
+  const processingTrend = monthlyData
+    .filter((m) => m.avgDurationMin > 0)
+    .map((m) => ({
+      month: m.month,
+      avgMinutes: +m.avgDurationMin.toFixed(1),
+      hoursProcessed: m.hoursProcessed,
+    }));
+
+  const dailyHeatmapData = Array.from({ length: 365 }, (_, i) => {
+    const date = new Date('2025-03-01');
+    date.setDate(date.getDate() + i);
+    const seed = Math.sin(i * 127.1) * 0.5 + 0.5;
+    const monthIdx = Math.min(Math.floor(i / 30), monthlyData.length - 1);
+    const baseValue = monthlyData[monthIdx]?.videosProcessed ?? 0;
+    return {
+      date: date.toISOString().slice(0, 10),
+      value: Math.round((baseValue / 30) * (0.3 + seed * 1.4)),
+    };
+  });
+
   return (
     <DashboardLayout title="Processing Insights" subtitle="AI pipeline performance, throughput and efficiency">
       <div className="space-y-6 animate-fade-in">
@@ -71,10 +77,30 @@ const ProcessingInsights: React.FC = () => {
 
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <StatsCard title="Avg Processing Time" value="27.4 min" trend={{ value: -18.2, label: 'vs Mar 25' }} icon={<Clock size={16} />} accentColor="green" />
-          <StatsCard title="Hours Processed" value="3,992 hrs" trend={{ value: 10.5, label: 'MoM' }} icon={<Cpu size={16} />} accentColor="red" />
-          <StatsCard title="Pipeline Efficiency" value="94.2%" trend={{ value: 3.1, label: 'MoM' }} icon={<Activity size={16} />} accentColor="blue" />
-          <StatsCard title="Longest Job" value="4h 12m" icon={<TrendingDown size={16} />} accentColor="amber" />
+          <StatsCard
+            title="Avg Processing Time"
+            value={kpis ? `${kpis.avgProcessingTimeMin.toFixed(1)} min` : '—'}
+            icon={<Clock size={16} />}
+            accentColor="green"
+          />
+          <StatsCard
+            title="Hours Processed"
+            value={kpis ? `${kpis.totalHoursProcessed.toLocaleString(undefined, { maximumFractionDigits: 0 })} hrs` : '—'}
+            icon={<Cpu size={16} />}
+            accentColor="red"
+          />
+          <StatsCard
+            title="Publish Rate"
+            value={kpis ? `${(kpis.publishRate * 100).toFixed(1)}%` : '—'}
+            icon={<Activity size={16} />}
+            accentColor="blue"
+          />
+          <StatsCard
+            title="Longest Duration Bucket"
+            value={longestBucket}
+            icon={<TrendingDown size={16} />}
+            accentColor="amber"
+          />
         </div>
 
         {/* Charts */}
@@ -91,7 +117,7 @@ const ProcessingInsights: React.FC = () => {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1C1C1C" vertical={false} />
                 <XAxis dataKey="month" tick={{ fill: '#71717A', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#71717A', fontSize: 11 }} axisLine={false} tickLine={false} unit="m" domain={[20, 40]} />
+                <YAxis tick={{ fill: '#71717A', fontSize: 11 }} axisLine={false} tickLine={false} unit="m" />
                 <Tooltip content={<DarkTooltip />} />
                 <Area type="monotone" dataKey="avgMinutes" name="Avg Time (min)" stroke={CHART_COLORS.green} strokeWidth={2.5}
                   fill="url(#gradGreen)" dot={false} />
@@ -116,14 +142,14 @@ const ProcessingInsights: React.FC = () => {
           </ChartCard>
         </div>
 
-        {/* Queue + throughput */}
-        <ChartCard title="Pipeline Queue & Throughput" subtitle="Feb 2026 — daily queue depth (jobs) and throughput (jobs/hr)" height={220}
-          tooltip="Queue depth indicates pending jobs; throughput is completed jobs per hour.">
+        {/* Upload vs Publish conversion — real monthly data */}
+        <ChartCard title="Upload vs Publish — Monthly" subtitle="Videos uploaded and published each month" height={220}
+          tooltip="Comparing content ingested vs. actually published shows your monthly publish conversion pipeline.">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={queueHealth} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+            <AreaChart data={monthlyData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="gradAmber" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={CHART_COLORS.amber} stopOpacity={0.2} />
+                  <stop offset="5%" stopColor={CHART_COLORS.amber} stopOpacity={0.25} />
                   <stop offset="95%" stopColor={CHART_COLORS.amber} stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="gradBlue2" x1="0" y1="0" x2="0" y2="1">
@@ -132,11 +158,12 @@ const ProcessingInsights: React.FC = () => {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#1C1C1C" vertical={false} />
-              <XAxis dataKey="date" tick={{ fill: '#71717A', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <XAxis dataKey="month" tick={{ fill: '#71717A', fontSize: 11 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: '#71717A', fontSize: 11 }} axisLine={false} tickLine={false} />
               <Tooltip content={<DarkTooltip />} />
-              <Area type="monotone" dataKey="queue" name="Queue Depth" stroke={CHART_COLORS.amber} strokeWidth={2} fill="url(#gradAmber)" dot={false} />
-              <Area type="monotone" dataKey="throughput" name="Throughput (jobs/hr)" stroke={CHART_COLORS.blue} strokeWidth={2} fill="url(#gradBlue2)" dot={false} />
+              <Legend formatter={(v) => <span style={{ color: '#A1A1AA', fontSize: 11 }}>{v}</span>} />
+              <Area type="monotone" dataKey="videosProcessed" name="Uploaded" stroke={CHART_COLORS.amber} strokeWidth={2} fill="url(#gradAmber)" dot={false} />
+              <Area type="monotone" dataKey="videosPublished" name="Published" stroke={CHART_COLORS.blue} strokeWidth={2} fill="url(#gradBlue2)" dot={false} />
             </AreaChart>
           </ResponsiveContainer>
         </ChartCard>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard-layout';
 import { PageHeader } from '@/components/page-header';
 import { StatsCard } from '@/components/stats-card';
@@ -9,8 +9,9 @@ import {
 } from 'recharts';
 import { motion } from 'framer-motion';
 import { Globe2 } from 'lucide-react';
-import { languageData } from '@/data/mockData';
+import { languageData as mockLanguages } from '@/data/mockData';
 import { CHART_COLORS } from '@/types';
+import { useLanguages } from '@/hooks/useApi';
 
 const DarkTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
@@ -35,8 +36,17 @@ const LANG_COLORS = [
 ];
 
 const LanguageAnalytics: React.FC = () => {
+  const { data: liveLanguages } = useLanguages();
+  const languageData = liveLanguages ?? mockLanguages;
   const total = languageData.reduce((s, l) => s + l.count, 0);
+
+  useEffect(() => {
+    if (!liveLanguages) console.warn('[LanguageAnalytics] Language data unavailable — showing mock fallback');
+  }, [liveLanguages]);
   const pieData = languageData.map((l, i) => ({ ...l, color: LANG_COLORS[i] }));
+
+  const topLang        = languageData[0];
+  const multilingualTotal = languageData.slice(1).reduce((s, l) => s + l.count, 0);
 
   return (
     <DashboardLayout title="Language Analytics" subtitle="Content output broken down by language">
@@ -50,10 +60,30 @@ const LanguageAnalytics: React.FC = () => {
 
         {/* KPI strip */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <StatsCard title="Languages Supported" value="8" trend={{ value: 33, label: 'YoY' }} icon={<Globe2 size={16} />} accentColor="blue" />
-          <StatsCard title="Top Language" value="English" unit="47.2% share" accentColor="red" />
-          <StatsCard title="Fastest Growing" value="Spanish" unit="+38% YoY" trend={{ value: 38, label: 'YoY' }} accentColor="amber" />
-          <StatsCard title="Total Multilingual" value="3,173" unit="clips" accentColor="green" />
+          <StatsCard
+            title="Languages Supported"
+            value={languageData.length || '—'}
+            icon={<Globe2 size={16} />}
+            accentColor="blue"
+          />
+          <StatsCard
+            title="Top Language"
+            value={topLang?.language ?? '—'}
+            unit={topLang ? `${topLang.percentage.toFixed(1)}% share` : ''}
+            accentColor="red"
+          />
+          <StatsCard
+            title="Total Videos"
+            value={total.toLocaleString()}
+            unit="across all languages"
+            accentColor="amber"
+          />
+          <StatsCard
+            title="Non-primary Languages"
+            value={multilingualTotal.toLocaleString()}
+            unit="videos"
+            accentColor="green"
+          />
         </div>
 
         {/* Language cards */}

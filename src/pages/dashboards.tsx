@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { DashboardLayout } from '@/components/dashboard-layout';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -16,317 +18,540 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import {
-  Plus,
-  LayoutDashboard,
-  MoreHorizontal,
-  Pencil,
-  Trash2,
-  Copy,
-  ExternalLink,
-  BarChart3,
-  PieChart,
-  TrendingUp,
-  Table2,
-  Clock,
-  User,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
+import {
+  Plus, LayoutDashboard, MoreHorizontal, Pencil, Trash2, Copy,
+  ExternalLink, Lock, Users, User, Star, Clock, ShieldCheck,
+  BookmarkCheck, AlertCircle,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { useToast } from '@/hooks/use-toast';
-import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { useFilters } from '@/contexts/FilterContext';
 
-interface DashboardItem {
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+type DashboardType = 'official' | 'team' | 'personal';
+
+interface WidgetDef {
   id: string;
-  name: string;
-  description: string;
-  widgetCount: number;
-  lastModified: string;
-  author: string;
-  tag: 'Official' | 'Personal' | 'Shared';
-  thumbnailWidgets: ('bar' | 'line' | 'pie' | 'kpi' | 'table')[];
+  type: 'kpi' | 'chart' | 'table';
+  title: string;
+  endpoint: string;
 }
 
-const INITIAL_DASHBOARDS: DashboardItem[] = [
+interface SavedDashboard {
+  id: string;
+  name: string;
+  description?: string;
+  type: DashboardType;
+  filter_state: Record<string, string>;
+  widgets: WidgetDef[];
+  layout: string[];
+  created_at: string;
+  updated_at: string;
+  user_id: string;
+  metric_version: string;
+  query_version: string;
+  data_range: string;
+  // drill bookmarks as array of { label, url }
+  drill_bookmarks: { label: string; url: string }[];
+}
+
+// ── Persistence helpers ───────────────────────────────────────────────────────
+
+const STORAGE_KEY = 'frammer_saved_dashboards';
+
+function loadDashboards(): SavedDashboard[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return [];
+}
+
+function saveDashboards(dashboards: SavedDashboard[]) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(dashboards));
+}
+
+// ── Default official dashboards ───────────────────────────────────────────────
+
+const OFFICIAL_DASHBOARDS: SavedDashboard[] = [
   {
-    id: 'dash-1',
-    name: 'Executive Overview',
-    description: 'High-level KPIs, content funnel, and monthly trends for stakeholder reviews.',
-    widgetCount: 8,
-    lastModified: '2026-02-28',
-    author: 'Priya S.',
-    tag: 'Official',
-    thumbnailWidgets: ['kpi', 'bar', 'line', 'pie'],
+    id: 'official-overview',
+    name: 'Operations Overview',
+    description: 'Official executive overview of the content pipeline',
+    type: 'official',
+    filter_state: {},
+    widgets: [
+      { id: 'w1', type: 'kpi',   title: 'Pipeline KPIs',     endpoint: '/api/v1/core/kpis' },
+      { id: 'w2', type: 'chart', title: 'Monthly Trend',     endpoint: '/api/v1/trends/monthly' },
+      { id: 'w3', type: 'chart', title: 'Channel Health',    endpoint: '/api/v1/performance/analytics/channel-health' },
+    ],
+    layout: ['w1', 'w2', 'w3'],
+    created_at: '2025-01-01T00:00:00Z',
+    updated_at: '2025-01-01T00:00:00Z',
+    user_id: 'system',
+    metric_version: '1.0',
+    query_version:  '1.0',
+    data_range:     'last_30d',
+    drill_bookmarks: [],
   },
   {
-    id: 'dash-2',
-    name: 'Channel Performance',
-    description: 'Breakdown of clips, hours, and publish rate by channel.',
-    widgetCount: 6,
-    lastModified: '2026-02-20',
-    author: 'Arjun M.',
-    tag: 'Official',
-    thumbnailWidgets: ['bar', 'bar', 'table'],
-  },
-  {
-    id: 'dash-3',
-    name: 'Team Productivity',
-    description: 'Per-member processing metrics, throughput, and efficiency scores.',
-    widgetCount: 5,
-    lastModified: '2026-02-15',
-    author: 'Zara K.',
-    tag: 'Shared',
-    thumbnailWidgets: ['table', 'kpi', 'bar'],
-  },
-  {
-    id: 'dash-4',
-    name: 'Language & Region',
-    description: 'Content volume and publishing breakdown by language.',
-    widgetCount: 4,
-    lastModified: '2026-01-30',
-    author: 'Priya S.',
-    tag: 'Personal',
-    thumbnailWidgets: ['pie', 'bar'],
-  },
-  {
-    id: 'dash-5',
-    name: 'Client Portal — TechCorp',
-    description: 'Client-facing dashboard showing processed and published stats for TechCorp.',
-    widgetCount: 7,
-    lastModified: '2026-02-10',
-    author: 'Arnav R.',
-    tag: 'Shared',
-    thumbnailWidgets: ['kpi', 'kpi', 'line', 'table'],
-  },
-  {
-    id: 'dash-6',
-    name: 'Processing Funnel',
-    description: 'Upload → Process → Publish funnel with stage conversion rates.',
-    widgetCount: 3,
-    lastModified: '2026-01-18',
-    author: 'Divya P.',
-    tag: 'Personal',
-    thumbnailWidgets: ['kpi', 'bar', 'line'],
+    id: 'official-quality',
+    name: 'Data Quality Monitor',
+    description: 'Official DQ scorecard and rule evaluation dashboard',
+    type: 'official',
+    filter_state: {},
+    widgets: [
+      { id: 'w1', type: 'kpi',   title: 'DQ Score',    endpoint: '/api/v1/diagnostics/quality/summary' },
+      { id: 'w2', type: 'table', title: 'DQ Rules',    endpoint: '/api/v1/diagnostics/quality/rules' },
+      { id: 'w3', type: 'table', title: 'DQ Issues',   endpoint: '/api/v1/diagnostics/quality/issues' },
+    ],
+    layout: ['w1', 'w2', 'w3'],
+    created_at: '2025-01-01T00:00:00Z',
+    updated_at: '2025-01-01T00:00:00Z',
+    user_id: 'system',
+    metric_version: '1.0',
+    query_version:  '1.0',
+    data_range:     'last_30d',
+    drill_bookmarks: [],
   },
 ];
 
-const TAG_COLORS: Record<DashboardItem['tag'], string> = {
-  Official: 'bg-frammer-red/15 text-frammer-red border-frammer-red/30',
-  Shared: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
-  Personal: 'bg-[#27272A] text-[#A1A1AA] border-[#3F3F46]',
+// ── Type icons ─────────────────────────────────────────────────────────────────
+
+const TYPE_CONFIG: Record<DashboardType, { icon: React.ReactNode; label: string; badge: string }> = {
+  official: { icon: <Lock className="h-3.5 w-3.5" />,   label: 'Official',  badge: 'bg-purple-500/15 text-purple-400 border-purple-500/30' },
+  team:     { icon: <Users className="h-3.5 w-3.5" />,  label: 'Team',      badge: 'bg-blue-500/15 text-blue-400 border-blue-500/30' },
+  personal: { icon: <User className="h-3.5 w-3.5" />,   label: 'Personal',  badge: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
 };
 
-const WIDGET_ICONS: Record<string, React.ReactNode> = {
-  bar: <BarChart3 size={14} className="text-[#52525B]" />,
-  line: <TrendingUp size={14} className="text-[#52525B]" />,
-  pie: <PieChart size={14} className="text-[#52525B]" />,
-  kpi: <span className="text-[10px] text-[#52525B] font-metric">KPI</span>,
-  table: <Table2 size={14} className="text-[#52525B]" />,
-};
+// ── Audit log ─────────────────────────────────────────────────────────────────
 
-function DashboardThumbnail({ widgets }: { widgets: DashboardItem['thumbnailWidgets'] }) {
-  return (
-    <div className="h-28 bg-[#0D0D0D] rounded-lg overflow-hidden p-3 grid grid-cols-3 gap-1.5">
-      {widgets.map((w, i) => (
-        <div
-          key={i}
-          className={cn(
-            'rounded bg-[#1C1C1C] flex items-center justify-center',
-            i === 0 && widgets.length <= 3 ? 'col-span-2' : ''
-          )}
-        >
-          {WIDGET_ICONS[w]}
-        </div>
-      ))}
-    </div>
-  );
+interface AuditEntry {
+  id: string;
+  action: 'created' | 'updated' | 'deleted' | 'viewed';
+  dashboard_name: string;
+  dashboard_id: string;
+  timestamp: string;
+  user_id: string;
+  metric_version: string;
+  data_range: string;
 }
 
-export default function DashboardsPage() {
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const [dashboards, setDashboards] = useState<DashboardItem[]>(INITIAL_DASHBOARDS);
-  const [filterTag, setFilterTag] = useState<string>('All');
-  const [createOpen, setCreateOpen] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newDesc, setNewDesc] = useState('');
+const AUDIT_KEY = 'frammer_audit_log';
 
-  const filtered =
-    filterTag === 'All' ? dashboards : dashboards.filter((d) => d.tag === filterTag);
+function loadAuditLog(): AuditEntry[] {
+  try {
+    const raw = localStorage.getItem(AUDIT_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return [];
+}
 
-  const handleDelete = (id: string) => {
-    setDashboards((p) => p.filter((d) => d.id !== id));
-    toast({ title: 'Dashboard deleted' });
+function appendAuditLog(entry: Omit<AuditEntry, 'id' | 'timestamp'>) {
+  const log = loadAuditLog();
+  const newEntry: AuditEntry = {
+    ...entry,
+    id: Date.now().toString(),
+    timestamp: new Date().toISOString(),
+  };
+  log.unshift(newEntry);
+  localStorage.setItem(AUDIT_KEY, JSON.stringify(log.slice(0, 100)));
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
+const Dashboards: React.FC = () => {
+  const { filters }                           = useFilters();
+  const [personalDashboards, setPersonalDashboards] = useState<SavedDashboard[]>(() => loadDashboards());
+  const [activeTab, setActiveTab]             = useState<'official' | 'team' | 'personal' | 'audit'>('official');
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [editTarget, setEditTarget]           = useState<SavedDashboard | null>(null);
+  const [newName, setNewName]                 = useState('');
+  const [newDesc, setNewDesc]                 = useState('');
+  const [newType, setNewType]                 = useState<DashboardType>('personal');
+  const [auditLog, setAuditLog]               = useState<AuditEntry[]>(() => loadAuditLog());
+
+  // Persist to localStorage on change
+  useEffect(() => {
+    saveDashboards(personalDashboards);
+  }, [personalDashboards]);
+
+  const currentFilterState = {
+    client:          filters.client,
+    channel:         filters.channel,
+    language:        filters.language,
+    dateRange:       filters.dateRange,
+    teamMember:      filters.teamMember,
+    inputType:       filters.inputType,
+    outputType:      filters.outputType,
+    publishedFlag:   filters.publishedFlag,
+    publishedPlatform: filters.publishedPlatform,
+    billableFlag:    filters.billableFlag,
   };
 
-  const handleDuplicate = (d: DashboardItem) => {
-    const newD: DashboardItem = {
-      ...d,
-      id: `dash-${Date.now()}`,
-      name: `${d.name} (copy)`,
-      tag: 'Personal',
-      lastModified: new Date().toISOString().slice(0, 10),
-    };
-    setDashboards((p) => [newD, ...p]);
-    toast({ title: 'Dashboard duplicated' });
-  };
-
-  const handleCreate = () => {
+  const createDashboard = () => {
     if (!newName.trim()) return;
-    const d: DashboardItem = {
-      id: `dash-${Date.now()}`,
-      name: newName.trim(),
-      description: newDesc.trim() || 'No description.',
-      widgetCount: 0,
-      lastModified: new Date().toISOString().slice(0, 10),
-      author: 'You',
-      tag: 'Personal',
-      thumbnailWidgets: [],
+    const d: SavedDashboard = {
+      id:               Date.now().toString(),
+      name:             newName.trim(),
+      description:      newDesc.trim(),
+      type:             newType,
+      filter_state:     currentFilterState,
+      widgets:          [],
+      layout:           [],
+      created_at:       new Date().toISOString(),
+      updated_at:       new Date().toISOString(),
+      user_id:          'current_user',
+      metric_version:   '1.0',
+      query_version:    '1.0',
+      data_range:       filters.dateRange,
+      drill_bookmarks:  [],
     };
-    setDashboards((p) => [d, ...p]);
-    setCreateOpen(false);
+    setPersonalDashboards(prev => [d, ...prev]);
+    appendAuditLog({ action: 'created', dashboard_name: d.name, dashboard_id: d.id, user_id: 'current_user', metric_version: '1.0', data_range: filters.dateRange });
+    setAuditLog(loadAuditLog());
+    setShowCreateDialog(false);
     setNewName('');
     setNewDesc('');
-    navigate('/dashboards/builder');
+  };
+
+  const saveCurrent = (id: string) => {
+    setPersonalDashboards(prev => prev.map(d =>
+      d.id === id
+        ? { ...d, filter_state: currentFilterState, updated_at: new Date().toISOString(), data_range: filters.dateRange }
+        : d
+    ));
+    appendAuditLog({ action: 'updated', dashboard_name: personalDashboards.find(d => d.id === id)?.name ?? id, dashboard_id: id, user_id: 'current_user', metric_version: '1.0', data_range: filters.dateRange });
+    setAuditLog(loadAuditLog());
+  };
+
+  const deleteDashboard = (id: string) => {
+    const d = personalDashboards.find(d => d.id === id);
+    if (d) appendAuditLog({ action: 'deleted', dashboard_name: d.name, dashboard_id: id, user_id: 'current_user', metric_version: '1.0', data_range: d.data_range });
+    setPersonalDashboards(prev => prev.filter(d => d.id !== id));
+    setAuditLog(loadAuditLog());
+  };
+
+  const duplicateDashboard = (d: SavedDashboard) => {
+    const copy: SavedDashboard = {
+      ...d,
+      id:   Date.now().toString(),
+      name: `${d.name} (copy)`,
+      type: 'personal',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    setPersonalDashboards(prev => [copy, ...prev]);
+  };
+
+  const DashboardCard = ({ d, readonly = false }: { d: SavedDashboard; readonly?: boolean }) => {
+    const cfg   = TYPE_CONFIG[d.type];
+    const isStale = d.filter_state.dateRange !== filters.dateRange;
+    return (
+      <div className="frammer-card p-4 space-y-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap mb-0.5">
+              <span className={cn('inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wide', cfg.badge)}>
+                {cfg.icon}
+                {cfg.label}
+              </span>
+              {isStale && !readonly && (
+                <span className="text-[10px] text-amber-400 flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  Stale filters
+                </span>
+              )}
+            </div>
+            <h3 className="text-sm font-semibold text-[#E4E4E7] truncate">{d.name}</h3>
+            {d.description && <p className="text-[11px] text-[#52525B] mt-0.5 line-clamp-2">{d.description}</p>}
+          </div>
+          {!readonly && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-[#52525B] hover:text-[#A1A1AA] flex-shrink-0">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => saveCurrent(d.id)} className="gap-2">
+                  <BookmarkCheck className="h-4 w-4" /> Save current filters
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => duplicateDashboard(d)} className="gap-2">
+                  <Copy className="h-4 w-4" /> Duplicate
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => deleteDashboard(d.id)} className="gap-2 text-destructive focus:text-destructive">
+                  <Trash2 className="h-4 w-4" /> Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+
+        {/* Saved filter chips */}
+        {Object.entries(d.filter_state).filter(([, v]) => v && v !== 'all').length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {Object.entries(d.filter_state)
+              .filter(([, v]) => v && v !== 'all')
+              .map(([k, v]) => (
+                <Badge key={k} variant="secondary" className="text-[10px]">{k}: {v}</Badge>
+              ))}
+          </div>
+        )}
+
+        {/* Widgets preview */}
+        {d.widgets.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {d.widgets.slice(0, 3).map(w => (
+              <span key={w.id} className="text-[10px] px-1.5 py-0.5 rounded bg-[#111] border border-[#1C1C1C] text-[#71717A]">
+                {w.title}
+              </span>
+            ))}
+            {d.widgets.length > 3 && (
+              <span className="text-[10px] text-[#52525B]">+{d.widgets.length - 3} more</span>
+            )}
+          </div>
+        )}
+
+        {/* Drill bookmarks */}
+        {d.drill_bookmarks.length > 0 && (
+          <div className="space-y-1">
+            {d.drill_bookmarks.slice(0, 2).map((b, i) => (
+              <a key={i} href={b.url} className="flex items-center gap-1 text-[11px] text-primary hover:underline">
+                <ExternalLink className="h-3 w-3" /> {b.label}
+              </a>
+            ))}
+          </div>
+        )}
+
+        {/* Audit metadata */}
+        <div className="border-t border-[#1C1C1C] pt-2 text-[10px] text-[#3a3a3a] flex flex-wrap gap-x-3 gap-y-0.5">
+          <span className="flex items-center gap-1"><Clock className="h-2.5 w-2.5" /> {new Date(d.updated_at).toLocaleDateString()}</span>
+          <span className="flex items-center gap-1"><ShieldCheck className="h-2.5 w-2.5" /> v{d.metric_version}</span>
+          <span>{d.data_range}</span>
+        </div>
+      </div>
+    );
   };
 
   return (
-    <DashboardLayout title="Dashboards" subtitle="Manage your analytics dashboards">
-      <div className="space-y-5">
-        <div className="flex items-center justify-between">
+    <DashboardLayout title="Dashboards" subtitle="Governance, saved views, and audit trail">
+      <div className="space-y-6 animate-fade-in">
+
+        <div className="flex items-start justify-between gap-4">
           <PageHeader
-            title="Dashboards"
-            subtitle={`${dashboards.length} dashboards across your workspace`}
+            title="Saved Dashboards"
+            subtitle="Official, team, and personal dashboards with filter state persistence and audit trail"
+            badge={{ label: 'GOVERNANCE', variant: 'blue' as any }}
+            onDownload={() => {}}
           />
           <Button
-            onClick={() => setCreateOpen(true)}
             size="sm"
-            className="bg-frammer-red hover:bg-frammer-red/90 text-white text-xs"
+            className="gap-1.5 shrink-0"
+            onClick={() => setShowCreateDialog(true)}
           >
-            <Plus size={13} className="mr-1.5" /> New Dashboard
+            <Plus className="h-4 w-4" />
+            New Dashboard
           </Button>
         </div>
 
-        {/* Filter tabs */}
-        <div className="flex gap-1">
-          {['All', 'Official', 'Shared', 'Personal'].map((t) => (
-            <button
-              key={t}
-              onClick={() => setFilterTag(t)}
-              className={cn(
-                'px-3 py-1.5 rounded-full text-xs transition-all',
-                filterTag === t
-                  ? 'bg-frammer-red/15 text-white border border-frammer-red/30'
-                  : 'text-[#52525B] hover:text-white'
+        {/* Current context bar */}
+        <div className="frammer-card p-3 text-xs flex flex-wrap items-center gap-3">
+          <span className="text-[#52525B]">Current filter state:</span>
+          {Object.entries(currentFilterState).filter(([, v]) => v && v !== 'all').length === 0 ? (
+            <span className="text-[#71717A]">No filters active (showing all data)</span>
+          ) : (
+            Object.entries(currentFilterState).filter(([, v]) => v && v !== 'all').map(([k, v]) => (
+              <Badge key={k} variant="secondary" className="text-[10px]">{k}: {v}</Badge>
+            ))
+          )}
+        </div>
+
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={v => setActiveTab(v as typeof activeTab)}>
+          <TabsList className="bg-[#111] border border-[#1C1C1C]">
+            <TabsTrigger value="official">
+              <Lock className="h-3.5 w-3.5 mr-1.5" />
+              Official ({OFFICIAL_DASHBOARDS.length})
+            </TabsTrigger>
+            <TabsTrigger value="personal">
+              <User className="h-3.5 w-3.5 mr-1.5" />
+              Personal ({personalDashboards.filter(d => d.type === 'personal').length})
+            </TabsTrigger>
+            <TabsTrigger value="team">
+              <Users className="h-3.5 w-3.5 mr-1.5" />
+              Team ({personalDashboards.filter(d => d.type === 'team').length})
+            </TabsTrigger>
+            <TabsTrigger value="audit">
+              <ShieldCheck className="h-3.5 w-3.5 mr-1.5" />
+              Audit Log
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Official dashboards */}
+          <TabsContent value="official" className="mt-4">
+            <div className="mb-3 flex items-center gap-2 text-xs text-[#52525B]">
+              <Lock className="h-3.5 w-3.5" />
+              Official dashboards are read-only templates managed by the platform team.
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {OFFICIAL_DASHBOARDS.map(d => (
+                <DashboardCard key={d.id} d={d} readonly />
+              ))}
+            </div>
+          </TabsContent>
+
+          {/* Personal dashboards */}
+          <TabsContent value="personal" className="mt-4">
+            {personalDashboards.filter(d => d.type === 'personal').length === 0 ? (
+              <div className="text-center py-12 text-[#52525B] text-sm">
+                <LayoutDashboard className="mx-auto h-8 w-8 mb-2 opacity-40" />
+                No personal dashboards yet. Click "New Dashboard" to create one.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {personalDashboards.filter(d => d.type === 'personal').map(d => (
+                  <DashboardCard key={d.id} d={d} />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Team dashboards */}
+          <TabsContent value="team" className="mt-4">
+            {personalDashboards.filter(d => d.type === 'team').length === 0 ? (
+              <div className="text-center py-12 text-[#52525B] text-sm">
+                <Users className="mx-auto h-8 w-8 mb-2 opacity-40" />
+                No team dashboards yet. Create one and set the type to "Team".
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {personalDashboards.filter(d => d.type === 'team').map(d => (
+                  <DashboardCard key={d.id} d={d} />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Audit Log */}
+          <TabsContent value="audit" className="mt-4">
+            <div className="frammer-card overflow-hidden">
+              <div className="px-5 py-3 border-b border-[#1C1C1C] flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-[#E4E4E7]">Audit Log</h3>
+                <span className="text-[10px] text-[#52525B]">Last 100 actions · stored locally</span>
+              </div>
+              {auditLog.length === 0 ? (
+                <div className="py-8 text-center text-xs text-[#52525B]">No audit entries yet.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-[#1C1C1C]">
+                        {['Time', 'Action', 'Dashboard', 'User', 'Metric v', 'Data Range'].map(h => (
+                          <th key={h} className="px-4 py-2.5 text-left text-[11px] font-medium text-[#52525B] uppercase tracking-wide">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {auditLog.map(entry => (
+                        <tr key={entry.id} className="border-b border-[#0F0F0F] hover:bg-white/[0.02]">
+                          <td className="px-4 py-2 font-mono text-[#52525B]">{new Date(entry.timestamp).toLocaleString()}</td>
+                          <td className="px-4 py-2">
+                            <Badge
+                              variant="outline"
+                              className={cn('text-[10px] capitalize', {
+                                'text-green-400 border-green-500/30': entry.action === 'created',
+                                'text-blue-400 border-blue-500/30':   entry.action === 'updated',
+                                'text-red-400 border-red-500/30':     entry.action === 'deleted',
+                                'text-[#71717A]':                      entry.action === 'viewed',
+                              })}
+                            >
+                              {entry.action}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-2 text-[#A1A1AA] max-w-[160px] truncate">{entry.dashboard_name}</td>
+                          <td className="px-4 py-2 text-[#71717A] font-mono">{entry.user_id}</td>
+                          <td className="px-4 py-2 text-[#52525B] font-mono">v{entry.metric_version}</td>
+                          <td className="px-4 py-2 text-[#52525B]">{entry.data_range}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
+            </div>
+          </TabsContent>
+        </Tabs>
 
-        {/* Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filtered.map((d, i) => (
-            <motion.div
-              key={d.id}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
-              className="frammer-card group hover:border-[#3F3F46] transition-all flex flex-col"
-            >
-              <div className="p-4 flex-1 space-y-3">
-                <DashboardThumbnail widgets={d.thumbnailWidgets} />
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-white font-semibold truncate">{d.name}</p>
-                    <p className="text-xs text-[#52525B] mt-0.5 line-clamp-2">{d.description}</p>
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button className="text-[#52525B] hover:text-white transition-colors mt-0.5 opacity-0 group-hover:opacity-100">
-                        <MoreHorizontal size={15} />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="bg-[#161616] border-[#27272A]">
-                      <DropdownMenuItem onClick={() => navigate('/dashboards/builder')} className="text-[#A1A1AA] text-xs hover:text-white cursor-pointer">
-                        <Pencil size={12} className="mr-2" /> Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleDuplicate(d)} className="text-[#A1A1AA] text-xs hover:text-white cursor-pointer">
-                        <Copy size={12} className="mr-2" /> Duplicate
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleDelete(d.id)} className="text-red-400 text-xs hover:text-red-300 cursor-pointer">
-                        <Trash2 size={12} className="mr-2" /> Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-                <div className="flex items-center justify-between">
-                  <Badge variant="outline" className={cn('text-[10px] px-2 py-0 border', TAG_COLORS[d.tag])}>
-                    {d.tag}
-                  </Badge>
-                  <span className="text-[10px] text-[#52525B]">{d.widgetCount} widgets</span>
-                </div>
-                <div className="flex items-center gap-3 text-[10px] text-[#52525B]">
-                  <span className="flex items-center gap-1"><User size={9} /> {d.author}</span>
-                  <span className="flex items-center gap-1"><Clock size={9} /> {d.lastModified}</span>
+        {/* Create dialog */}
+        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+          <DialogContent className="bg-[#111] border-[#1C1C1C]">
+            <DialogHeader>
+              <DialogTitle>New Dashboard</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="space-y-1.5">
+                <label className="text-xs text-[#71717A]">Name *</label>
+                <Input
+                  className="bg-[#0a0a0a] border-[#1C1C1C]"
+                  placeholder="My dashboard"
+                  value={newName}
+                  onChange={e => setNewName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs text-[#71717A]">Description</label>
+                <Input
+                  className="bg-[#0a0a0a] border-[#1C1C1C]"
+                  placeholder="Optional description"
+                  value={newDesc}
+                  onChange={e => setNewDesc(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs text-[#71717A]">Type</label>
+                <div className="flex gap-2">
+                  {(['personal', 'team'] as DashboardType[]).map(t => (
+                    <button
+                      key={t}
+                      onClick={() => setNewType(t)}
+                      className={cn(
+                        'flex-1 text-xs py-2 rounded border transition-colors capitalize',
+                        newType === t
+                          ? 'border-primary text-primary bg-primary/10'
+                          : 'border-[#1C1C1C] text-[#71717A] hover:border-[#3a3a3a]',
+                      )}
+                    >
+                      {t}
+                    </button>
+                  ))}
                 </div>
               </div>
-              <div className="px-4 py-2.5 border-t border-[#1C1C1C] flex gap-2">
-                <Button
-                  onClick={() => navigate('/dashboards/builder')}
-                  size="sm"
-                  className="flex-1 h-7 text-[11px] bg-frammer-red/15 hover:bg-frammer-red/25 text-white border-0"
-                >
-                  <ExternalLink size={10} className="mr-1.5" /> Open
-                </Button>
-                <Button
-                  onClick={() => navigate('/dashboards/builder')}
-                  size="sm"
-                  variant="ghost"
-                  className="flex-1 h-7 text-[11px] text-[#52525B] hover:text-white"
-                >
-                  <Pencil size={10} className="mr-1.5" /> Edit
-                </Button>
+              <div className="text-[11px] text-[#52525B] p-3 rounded bg-[#0a0a0a] border border-[#1C1C1C]">
+                Current filters will be saved automatically. Metric version and timestamp are logged for audit.
               </div>
-            </motion.div>
-          ))}
-        </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowCreateDialog(false)} className="bg-[#111] border-[#1C1C1C]">
+                Cancel
+              </Button>
+              <Button onClick={createDashboard} disabled={!newName.trim()}>
+                Create Dashboard
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
       </div>
-
-      {/* Create dialog */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="bg-[#111111] border-[#27272A] text-white max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-base flex items-center gap-2">
-              <LayoutDashboard size={16} className="text-frammer-red" /> New Dashboard
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <Input
-              placeholder="Dashboard name"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              className="bg-[#1C1C1C] border-[#3F3F46] text-white text-sm"
-            />
-            <Textarea
-              placeholder="Description (optional)"
-              value={newDesc}
-              onChange={(e) => setNewDesc(e.target.value)}
-              rows={2}
-              className="bg-[#1C1C1C] border-[#3F3F46] text-white text-sm resize-none"
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" size="sm" onClick={() => setCreateOpen(false)} className="text-[#52525B] text-xs">Cancel</Button>
-            <Button onClick={handleCreate} size="sm" className="bg-frammer-red hover:bg-frammer-red/90 text-white text-xs">
-              Create & Open Builder
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </DashboardLayout>
   );
-}
+};
+
+export default Dashboards;
