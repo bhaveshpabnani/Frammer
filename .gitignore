@@ -9,8 +9,6 @@ build/
 *.pyo
 *.pyd
 
-# Environment
-.env
 
 # Alembic
 alembic/versions/__pycache__/
