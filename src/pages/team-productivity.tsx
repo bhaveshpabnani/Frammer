@@ -12,7 +12,7 @@ import {
 import { motion } from 'framer-motion';
 import { Users, TrendingUp, AlertTriangle, ExternalLink } from 'lucide-react';
 import { CHART_COLORS } from '@/types';
-import { formatNumber, cn } from '@/lib/utils';
+import { formatNumber, cn, downloadCsv } from '@/lib/utils';
 import {
   useUserProductivity, useBenchmarks, useMultiDimensional, useMonthly,
   useQualityIssues, useTeams,
@@ -134,7 +134,7 @@ const TeamProductivity: React.FC = () => {
           title="Team & User Productivity"
           subtitle="Productivity index, peer benchmarks, specialization matrix, and consistency"
           badge={{ label: 'LIVE', variant: 'red' }}
-          onDownload={() => {}}
+          onDownload={() => downloadCsv('frammer-team-productivity', (productivityData ?? []).map(r => ({ user: r.user, total_uploaded: r.total_uploaded, total_published: r.total_published, publish_conversion_pct: r.publish_conversion_pct, productivity_index: r.productivity_index })))}
         />
 
         <CrossFilterBar />

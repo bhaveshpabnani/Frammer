@@ -18,9 +18,17 @@ const DIMENSION_OPTIONS = [
 const METRIC_OPTIONS = [
   { value: 'uploaded', label: 'Videos Uploaded' },
   { value: 'published', label: 'Videos Published' },
-  { value: 'created', label: 'Clips Generated' },
-  { value: 'duration', label: 'Duration (hrs)' },
+  { value: 'publish_conversion_pct', label: 'Publish Conversion %' },
+  { value: 'duration_hrs', label: 'Duration (hrs)' },
 ];
+
+/** Pick the right numeric field from a cell based on the selected metric */
+function getCellValue(cell: Record<string, number>, metric: string): number {
+  if (metric === 'published')             return cell.published            ?? 0;
+  if (metric === 'duration_hrs')          return cell.duration_hrs         ?? 0;
+  if (metric === 'publish_conversion_pct') return cell.publish_conversion_pct ?? 0;
+  return cell.uploaded ?? 0; // default 'uploaded'
+}
 
 /** Generate a color on a blue→red heat scale from 0..1 */
 function heatColor(ratio: number): string {
@@ -43,20 +51,22 @@ const MultiDimensional: React.FC = () => {
   const cellMap = useMemo(() => {
     if (!data) return new Map<string, Map<string, number>>();
     const m = new Map<string, Map<string, number>>();
-    for (const cell of data.cells) {
-      if (!m.has(cell.dim1_value)) m.set(cell.dim1_value, new Map());
-      m.get(cell.dim1_value)!.set(cell.dim2_value, cell.value);
+    for (const cell of data.cells as unknown as Record<string, number>[]) {
+      const d1 = String(cell.dim1);
+      const d2 = String(cell.dim2);
+      if (!m.has(d1)) m.set(d1, new Map());
+      m.get(d1)!.set(d2, getCellValue(cell, metric));
     }
     return m;
-  }, [data]);
+  }, [data, metric]);
 
   const maxVal = useMemo(() => {
     if (!data?.cells.length) return 1;
-    return Math.max(...data.cells.map((c) => c.value), 1);
-  }, [data]);
+    return Math.max(...(data.cells as unknown as Record<string, number>[]).map((c) => getCellValue(c, metric)), 1);
+  }, [data, metric]);
 
-  const dim1Labels = data?.dim1_labels ?? [];
-  const dim2Labels = data?.dim2_labels ?? [];
+  const dim1Labels = data?.dim1_values ?? [];
+  const dim2Labels = data?.dim2_values ?? [];
 
   const dim1Label = DIMENSION_OPTIONS.find((d) => d.value === dim1)?.label ?? dim1;
   const dim2Label = DIMENSION_OPTIONS.find((d) => d.value === dim2)?.label ?? dim2;

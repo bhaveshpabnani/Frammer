@@ -15,7 +15,7 @@ import {
   Send, Bot, Sparkles, Code2, BarChart3, Copy, RefreshCw, BookOpen,
   Lightbulb, AlertCircle, CheckCircle2, HelpCircle,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, downloadCsv } from '@/lib/utils';
 import { CHART_COLORS } from '@/types';
 import { useRegistryMetrics } from '@/hooks/useApi';
 import { useFilters } from '@/contexts/FilterContext';
@@ -214,7 +214,11 @@ const AIAnalytics: React.FC = () => {
             title="AI Analytics"
             subtitle="Semantic query engine — ask anything about your content pipeline"
             badge={{ label: 'BETA', variant: 'blue' as any }}
-            onDownload={() => {}}
+            onDownload={() => {
+              const last = sessions.filter(s => s.data && s.data.length > 0).at(-1);
+              if (!last?.data) return;
+              downloadCsv(`ai-result-${new Date().toISOString().slice(0,10)}.csv`, last.data as Record<string, unknown>[]);
+            }}
           />
 
           {/* Knowledge base drawer */}
