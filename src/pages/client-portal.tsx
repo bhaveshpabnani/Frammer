@@ -12,7 +12,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { Users, TrendingUp, Video, Scissors, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
 import { CHART_COLORS } from '@/types';
-import { formatNumber, cn } from '@/lib/utils';
+import { formatNumber, cn, downloadCsv } from '@/lib/utils';
 import { useClientsSummary, useKpis, useConcentration, useChannelHealth } from '@/hooks/useApi';
 import { useFilters } from '@/contexts/FilterContext';
 import type { ClientSummaryRow } from '@/api/types';
@@ -100,7 +100,7 @@ const ClientPortal: React.FC = () => {
           title="Client Portal"
           subtitle="Monitor usage, volume and health for each client account"
           badge={{ label: 'LIVE', variant: 'blue' }}
-          onDownload={() => {}}
+          onDownload={() => downloadCsv('frammer-clients', clients.map(c => ({ name: c.name, total_uploaded: c.total_uploaded, total_published: c.total_published, total_clips: c.total_clips, publish_rate_pct: (c.publish_rate * 100).toFixed(1), active_channels: c.active_channels, active_users: c.active_users, uploaded_duration_hrs: c.uploaded_duration_hrs })))}
         />
 
         {/* KPI strip */}

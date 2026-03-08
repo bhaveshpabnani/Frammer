@@ -20,7 +20,7 @@ import {
   languageData as mockLanguages,
 } from '@/data/mockData';
 import { CHART_COLORS } from '@/types';
-import { formatNumber, cn } from '@/lib/utils';
+import { formatNumber, cn, downloadCsv } from '@/lib/utils';
 import { FunnelChart } from '@/components/FunnelChart';
 import {
   useKpis, useMonthly, useChannels, useOutputTypes, useLanguages,
@@ -87,12 +87,12 @@ const Overview: React.FC = () => {
   const { data: qualityRules }                        = useQualityRules();
   const { data: agingData }                           = useLagAging();
 
-  // Merge live data with mock fallbacks
-  const kpis       = { ...mockKpis,       ...liveKpis };
-  const monthlyData  = liveMonthly    ?? mockMonthly;
-  const channelData  = liveChannels   ?? mockChannels;
+  // Use live data; fall back to mock only when live data has not loaded yet
+  const kpis         = liveKpis        ?? mockKpis;
+  const monthlyData  = liveMonthly     ?? mockMonthly;
+  const channelData  = liveChannels    ?? mockChannels;
   const outputTypes  = liveOutputTypes ?? mockOutputTypes;
-  const languageData = liveLanguages  ?? mockLanguages;
+  const languageData = liveLanguages   ?? mockLanguages;
 
   // ── Derived funnel figures (prefer funnel endpoint, fall back to kpis) ──────
   // Stage names are Title Case from the backend ("Uploaded", "Processed", "Published")
@@ -196,7 +196,7 @@ const Overview: React.FC = () => {
           title="Product Overview"
           subtitle="Executive diagnostics across clients, channels, and content types"
           badge={{ label: 'LIVE', variant: 'red' }}
-          onDownload={() => {}}
+          onDownload={() => downloadCsv('frammer-overview-monthly', monthlyData.map(m => ({ month: m.month, uploaded: m.videosProcessed, published: m.videosPublished, hours_processed: m.hoursProcessed, avg_duration_min: m.avgDurationMin })))}
         />
 
         {/* ── Alert strip ──────────────────────────────────────────────────────── */}

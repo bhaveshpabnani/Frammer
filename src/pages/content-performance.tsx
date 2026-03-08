@@ -11,9 +11,9 @@ import {
 import { motion } from 'framer-motion';
 import { Layers, FileInput, FileOutput, ArrowRight } from 'lucide-react';
 import { CHART_COLORS } from '@/types';
-import { formatNumber, cn } from '@/lib/utils';
+import { formatNumber, cn, downloadCsv } from '@/lib/utils';
 import {
-  useFunnel, useInputTypes, useOutputTypes, useMultiDimensional, useFilters as _useFilters,
+  useFunnel, useInputTypes, useOutputTypes, useMultiDimensional,
 } from '@/hooks/useApi';
 import { useFilters } from '@/contexts/FilterContext';
 import { FunnelChart } from '@/components/FunnelChart';
@@ -74,8 +74,14 @@ const ContentPerformance: React.FC = () => {
   const published = findStage('published')?.count ?? 0;
 
   // Total input type efficiency
-  const totalInputUploaded = inputTypes?.reduce((s, r) => s + r.count, 0) ?? 0;
-  const totalInputPublished = inputTypes?.reduce((s, r) => s + (r as any).published ?? 0, 0) ?? 0;
+  const totalInputUploaded  = inputTypes?.reduce((s, r) => s + r.count, 0) ?? 0;
+  // Use per-type published sum when available, fall back to funnel published stage
+  const totalInputPublished = (inputTypes?.some(r => (r.published ?? 0) > 0))
+    ? (inputTypes?.reduce((s, r) => s + (r.published ?? 0), 0) ?? published)
+    : published;
+  const inputConvRate = totalInputUploaded > 0
+    ? ((totalInputPublished / totalInputUploaded) * 100).toFixed(1)
+    : null;
 
   // Input type bar data (efficiency = publish rate per type)
   const inputBarData = useMemo(() => {
@@ -83,9 +89,10 @@ const ContentPerformance: React.FC = () => {
     return inputTypes
       .slice(0, 8)
       .map(r => ({
-        type:       r.type,
-        Uploaded:   r.count,
-        Hours:      Math.round(r.hours),
+        type:      r.type,
+        Uploaded:  r.count,
+        Published: r.published ?? 0,
+        Hours:     Math.round(r.hours),
       }));
   }, [inputTypes]);
 
@@ -136,7 +143,7 @@ const ContentPerformance: React.FC = () => {
           title="Content & Funnel"
           subtitle="Upload → Process → Publish pipeline with content type breakdown"
           badge={{ label: 'LIVE', variant: 'red' }}
-          onDownload={() => {}}
+          onDownload={() => downloadCsv('frammer-content-performance', (inputTypes ?? []).map(r => ({ type: r.type, uploaded: r.count, hours: r.hours })))}
         />
 
         <CrossFilterBar />
@@ -175,7 +182,7 @@ const ContentPerformance: React.FC = () => {
             {[
               { title: 'Total Uploaded',  value: formatNumber(uploaded),  icon: <Layers size={15} />,     accentColor: 'red' as const },
               { title: 'Total Processed', value: formatNumber(processed), icon: <FileInput size={15} />,  accentColor: 'blue' as const },
-              { title: 'Total Published', value: formatNumber(published), icon: <FileOutput size={15} />, accentColor: 'green' as const },
+              { title: 'Total Published', value: formatNumber(published), unit: inputConvRate ? `${inputConvRate}% conversion rate` : undefined, icon: <FileOutput size={15} />, accentColor: 'green' as const },
               {
                 title: 'Input Types',
                 value: String(inputTypes?.length ?? '—'),
@@ -260,7 +267,7 @@ const ContentPerformance: React.FC = () => {
         {/* ── Input type funnel bar ─────────────────────────────────────────────── */}
         <ChartCard
           title="Input Type Breakdown"
-          subtitle="Uploaded volume and hours by content input type"
+          subtitle="Uploaded vs published by content input type"
           height={260}
           tooltip="Input types with highest upload volume — click a bar to filter."
         >
@@ -283,7 +290,7 @@ const ContentPerformance: React.FC = () => {
                   dataKey="Uploaded"
                   fill={CHART_COLORS.red}
                   radius={[3, 3, 0, 0]}
-                  maxBarSize={32}
+                  maxBarSize={28}
                   onClick={(d) => updateFilters({ inputType: d.type })}
                   cursor="pointer"
                 >
@@ -291,6 +298,7 @@ const ContentPerformance: React.FC = () => {
                     <Cell key={i} fill={INPUT_COLORS[i % INPUT_COLORS.length]} fillOpacity={0.85} />
                   ))}
                 </Bar>
+                <Bar dataKey="Published" fill={CHART_COLORS.green} radius={[3, 3, 0, 0]} maxBarSize={28} />
               </BarChart>
             </ResponsiveContainer>
           )}

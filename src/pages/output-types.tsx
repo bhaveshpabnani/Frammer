@@ -9,9 +9,12 @@ import {
 } from 'recharts';
 import { outputTypeData as mockOutputTypes } from '@/data/mockData';
 import { CHART_COLORS, OUTPUT_TYPE_LABELS } from '@/types';
+import { downloadCsv } from '@/lib/utils';
 import { Layers, Scissors, TrendingUp } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useOutputTypes, useMonthly } from '@/hooks/useApi';
+import { useFilters } from '@/contexts/FilterContext';
+import { useNavigate } from 'react-router-dom';
 
 const DarkTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
@@ -32,6 +35,8 @@ const DarkTooltip = ({ active, payload, label }: any) => {
 const OutputTypes: React.FC = () => {
   const { data: liveOutputTypes } = useOutputTypes();
   const { data: liveMonthly } = useMonthly();
+  const { updateFilters } = useFilters();
+  const navigate = useNavigate();
   const outputTypeData = liveOutputTypes ?? mockOutputTypes;
   const total = outputTypeData.reduce((s, d) => s + d.count, 0);
 
@@ -56,7 +61,7 @@ const OutputTypes: React.FC = () => {
         <PageHeader
           title="Output Type Analytics"
           subtitle="Reels, Shorts, Chapters, Summaries, Viral Clips — deep-dive"
-          onDownload={() => {}}
+          onDownload={() => downloadCsv('frammer-output-types', outputTypeData.map(o => ({ type: o.type, clips: o.count, published: o.published ?? 0, share_pct: (o.count / Math.max(total, 1) * 100).toFixed(1) })))}
         />
 
         {/* Output type cards */}
@@ -74,6 +79,7 @@ const OutputTypes: React.FC = () => {
                 {item.type}
               </p>
               <p className="font-metric text-2xl font-medium text-white">{item.count.toLocaleString()}</p>
+              <p className="text-[10px] text-[#52525B]">clips</p>
               <div className="flex items-center gap-1">
                 <div className="flex-1 h-1 bg-[#1C1C1C] rounded-full overflow-hidden">
                   <div
@@ -127,14 +133,15 @@ const OutputTypes: React.FC = () => {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#1C1C1C]">
-                {['Output Type', 'Count', 'Share', 'MoM Growth'].map(h => (
+                {['Output Type', 'Clips', 'Published', 'Share'].map(h => (
                   <th key={h} className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-[#52525B]">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {outputTypeData.map((item, i) => (
-                <tr key={i} className="border-b border-[#0F0F0F] hover:bg-white/[0.02]">
+                <tr key={i} className="border-b border-[#0F0F0F] hover:bg-white/[0.04] cursor-pointer"
+                  onClick={() => { updateFilters({ outputType: item.type }); navigate('/videos'); }}>
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full" style={{ background: item.color }} />
@@ -142,6 +149,7 @@ const OutputTypes: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-5 py-3 font-metric text-[#A1A1AA]">{item.count.toLocaleString()}</td>
+                  <td className="px-5 py-3 font-metric text-[#A1A1AA]">{(item.published ?? 0).toLocaleString()}</td>
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2">
                       <div className="w-20 h-1.5 bg-[#1C1C1C] rounded-full overflow-hidden">
@@ -149,9 +157,6 @@ const OutputTypes: React.FC = () => {
                       </div>
                       <span className="font-metric text-xs text-[#A1A1AA]">{(item.count / total * 100).toFixed(1)}%</span>
                     </div>
-                  </td>
-                  <td className="px-5 py-3">
-                    <span className="badge-green text-xs">+{(8 + i * 1.2).toFixed(1)}%</span>
                   </td>
                 </tr>
               ))}

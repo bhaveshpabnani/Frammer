@@ -66,8 +66,8 @@ export const fetchMonthly = (qs: string) =>
 export const fetchGrowth = (qs: string) =>
   apiFetch<GrowthResponseRaw>(`${TRENDS}/growth${qs ? '?' + qs : ''}`);
 
-export const fetchForecast = (metric: string, horizon = 6) =>
-  apiFetch<ForecastResponse>(`${TRENDS}/forecast/${metric}?horizon=${horizon}`);
+export const fetchForecast = (metric: string, horizon = 6, qs = '') =>
+  apiFetch<ForecastResponse>(`${TRENDS}/forecast/${metric}?horizon=${horizon}${qs ? '&' + qs : ''}`);
 
 export const fetchGrowthDrivers = (dimension: string, qs: string) =>
   apiFetch<GrowthDriversResponse>(
@@ -89,8 +89,8 @@ export const fetchUsers = (qs: string) =>
 export const fetchTeams = (qs: string) =>
   apiFetch<TeamRow[]>(`${PERF}/teams${qs ? '?' + qs : ''}`);
 
-export const fetchClientsSummary = () =>
-  apiFetch<ClientSummaryRow[]>(`${PERF}/clients/summary`);
+export const fetchClientsSummary = (qs: string) =>
+  apiFetch<ClientSummaryRow[]>(`${PERF}/clients/summary${qs ? '?' + qs : ''}`);
 
 export const fetchChannelHealth = (qs: string) =>
   apiFetch<ChannelHealthRow[]>(`${PERF}/analytics/channel-health${qs ? '?' + qs : ''}`);

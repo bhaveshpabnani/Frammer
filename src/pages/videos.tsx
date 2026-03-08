@@ -34,7 +34,7 @@ import {
   Search, ChevronDown, AlertCircle, CheckCircle2, Clock, Flag, ExternalLink,
   ArrowLeft, ArrowRight,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, downloadCsv } from '@/lib/utils';
 import { useVideoExplorer } from '@/hooks/useApi';
 import { useFilters } from '@/contexts/FilterContext';
 import { toApiParams } from '@/api/client';
@@ -231,7 +231,7 @@ const VideoExplorer: React.FC = () => {
           title="Video Explorer"
           subtitle={`${total.toLocaleString()} records · terminal node for all drillthrough workflows`}
           badge={{ label: 'EXPLORER', variant: 'blue' as any }}
-          onDownload={() => {}}
+          onDownload={() => downloadCsv(`video-explorer-${new Date().toISOString().slice(0,10)}.csv`, rows.map(r => ({ ...r } as Record<string, unknown>)))}
         />
 
         <CrossFilterBar />

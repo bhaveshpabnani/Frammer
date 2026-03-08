@@ -173,6 +173,9 @@ export function useLanguages() {
       rows.map((r, i) => ({
         language: r.display_name,
         count: r.total_uploaded,
+        published: r.total_published,
+        processed: r.total_created,
+        hours: r.uploaded_duration_hrs,
         percentage: r.percentage,
         color: LANG_COLORS[i % LANG_COLORS.length],
       })),
@@ -196,6 +199,7 @@ export function useInputTypes() {
       rows.map((r, i) => ({
         type: r.input_type,
         count: r.total_uploaded,
+        published: r.total_published,
         hours: r.uploaded_duration_hrs,
         color: INPUT_COLORS[i % INPUT_COLORS.length],
       })),
@@ -219,6 +223,7 @@ export function useOutputTypes() {
       rows.map((r, i) => ({
         type: r.output_type,
         count: r.total_uploaded,
+        published: r.total_published,
         color: OUTPUT_COLORS[i % OUTPUT_COLORS.length],
       })),
     staleTime: 30_000,
@@ -298,9 +303,11 @@ export type ForecastMetric =
   | 'created_duration_hrs';
 
 export function useForecast(metric: ForecastMetric, horizon = 6) {
+  const { filters } = useFilters();
+  const qs = toApiParams(filters);
   return useQuery({
-    queryKey: ['forecast', metric, horizon],
-    queryFn: () => fetchForecast(metric, horizon),
+    queryKey: ['forecast', metric, horizon, qs],
+    queryFn: () => fetchForecast(metric, horizon, qs),
     staleTime: 60_000,
   });
 }
@@ -316,9 +323,11 @@ export function useDimensions() {
 
 // ── Clients Summary ────────────────────────────────────────────────────────────
 export function useClientsSummary() {
+  const { filters } = useFilters();
+  const qs = toApiParams(filters);
   return useQuery({
-    queryKey: ['clients-summary'],
-    queryFn: fetchClientsSummary,
+    queryKey: ['clients-summary', qs],
+    queryFn: () => fetchClientsSummary(qs),
     staleTime: 60_000,
   });
 }
@@ -628,6 +637,16 @@ export function useRegistryMetrics() {
   return useQuery({
     queryKey: ['registry-metrics'],
     queryFn: fetchRegistryMetrics,
+    select: (rows) =>
+      rows.map((m) => ({
+        ...m,
+        // Backend returns caveats as a plain string; normalise to string[]
+        caveats: Array.isArray(m.caveats)
+          ? m.caveats
+          : m.caveats
+          ? [m.caveats as unknown as string]
+          : [],
+      })),
     staleTime: 300_000,
   });
 }
