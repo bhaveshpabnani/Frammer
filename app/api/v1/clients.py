@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import FilterParams, get_db
+from app.registry.filters import build_where_clause
 from app.schemas.responses import ApiResponse, ClientSummaryRow
 from app.utils.response import wrap
 
@@ -19,13 +20,25 @@ async def get_clients_summary(
     f: FilterParams = Depends(),
     db: AsyncSession = Depends(get_db),
 ) -> ApiResponse[List[ClientSummaryRow]]:
-    """Return one aggregated row per client with volume + health KPIs."""
-    sql = text("""
+    """Return one aggregated row per client with volume + health KPIs.
+
+    Applies all active filters (date range, channel, language, user, team,
+    input_type, output_type, published_flag, published_platform, billable_flag).
+    The per-client grouping is preserved; filters narrow the video population
+    before aggregation.
+    """
+    where, params = build_where_clause(f)
+    # We always join fact_video so the global filters apply correctly.
+    # dim_client rows with zero videos after filtering are excluded.
+    where_sql = ("AND " + " AND ".join(where)) if where else ""
+
+    sql = text(f"""
         SELECT
             dc.slug,
             dc.name,
             COUNT(DISTINCT fv.id)                                           AS total_uploaded,
             SUM(CASE WHEN fv.published THEN 1 ELSE 0 END)                   AS total_published,
+            SUM(CASE WHEN fv.is_processed THEN 1 ELSE 0 END)               AS total_processed,
             COALESCE(SUM(clips.clip_count), 0)                              AS total_clips,
             ROUND(
                 SUM(CASE WHEN fv.published THEN 1 ELSE 0 END)::numeric
@@ -36,17 +49,19 @@ async def get_clients_summary(
             COUNT(DISTINCT fv.user_id)                                      AS active_users,
             ROUND(COALESCE(SUM(fv.uploaded_duration_sec), 0) / 3600.0, 2)  AS uploaded_duration_hrs
         FROM       dim_client dc
-        LEFT JOIN  fact_video fv ON fv.client_id = dc.id
+        JOIN       fact_video fv ON fv.client_id = dc.id
         LEFT JOIN  (
             SELECT video_id, SUM(created_count) AS clip_count
             FROM   fact_video_output_type
             GROUP BY video_id
         ) clips ON clips.video_id = fv.id
+        WHERE      1=1
+        {where_sql}
         GROUP BY   dc.id, dc.slug, dc.name
         ORDER BY   total_uploaded DESC
     """)
 
-    result = await db.execute(sql)
+    result = await db.execute(sql, params)
     rows = result.mappings().all()
 
     data = [
@@ -54,6 +69,7 @@ async def get_clients_summary(
             slug=r["slug"],
             name=r["name"],
             total_uploaded=int(r["total_uploaded"] or 0),
+            total_processed=int(r["total_processed"] or 0),
             total_published=int(r["total_published"] or 0),
             total_clips=int(r["total_clips"] or 0),
             publish_rate=float(r["publish_rate"] or 0.0),
@@ -64,7 +80,6 @@ async def get_clients_summary(
         for r in rows
     ]
     return wrap(data, f,
-                metrics=["total_uploaded", "total_published", "publish_rate", "uploaded_duration_hrs"],
+                metrics=["total_uploaded", "total_processed", "total_published", "publish_rate", "uploaded_duration_hrs"],
                 grain="segment-aggregated",
-                caveats=["This endpoint returns all clients regardless of date filter"],
                 unit="count")

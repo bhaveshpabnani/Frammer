@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import FilterParams, get_db
+from app.registry.filters import build_where_clause
 from app.schemas.responses import ApiResponse, DurationBucketRow
 from app.utils.response import wrap
 
@@ -20,20 +21,24 @@ async def get_duration_buckets(
     db: AsyncSession = Depends(get_db),
 ) -> ApiResponse[List[DurationBucketRow]]:
     """Return video count grouped by uploaded duration buckets."""
-    sql = text("""
+    where, params = build_where_clause(f)
+    fv_where = ("WHERE " + " AND ".join(where)) if where else ""
+
+    sql = text(f"""
         SELECT range, COUNT(*) AS count
         FROM (
             SELECT
                 CASE
-                    WHEN uploaded_duration_sec IS NULL OR uploaded_duration_sec = 0 THEN 'Unknown'
-                    WHEN uploaded_duration_sec < 1800                               THEN '< 30 min'
-                    WHEN uploaded_duration_sec < 3600                               THEN '30-60 min'
-                    WHEN uploaded_duration_sec < 7200                               THEN '1-2 hrs'
-                    WHEN uploaded_duration_sec < 14400                              THEN '2-4 hrs'
-                    WHEN uploaded_duration_sec < 28800                              THEN '4-8 hrs'
+                    WHEN fv.uploaded_duration_sec IS NULL OR fv.uploaded_duration_sec = 0 THEN 'Unknown'
+                    WHEN fv.uploaded_duration_sec < 1800                               THEN '< 30 min'
+                    WHEN fv.uploaded_duration_sec < 3600                               THEN '30-60 min'
+                    WHEN fv.uploaded_duration_sec < 7200                               THEN '1-2 hrs'
+                    WHEN fv.uploaded_duration_sec < 14400                              THEN '2-4 hrs'
+                    WHEN fv.uploaded_duration_sec < 28800                              THEN '4-8 hrs'
                     ELSE '> 8 hrs'
                 END AS range
-            FROM fact_video
+            FROM fact_video fv
+            {fv_where}
         ) sub
         GROUP BY range
         ORDER BY
@@ -48,7 +53,7 @@ async def get_duration_buckets(
             END
     """)
 
-    result = await db.execute(sql)
+    result = await db.execute(sql, params)
     rows = result.mappings().all()
 
     data = [
@@ -58,5 +63,5 @@ async def get_duration_buckets(
     return wrap(data, f,
                 metrics=["total_uploaded"],
                 grain="video-level",
-                caveats=["Duration buckets are computed from uploaded_duration_sec and ignore date filters"],
+                caveats=["Duration buckets are computed from uploaded_duration_sec"],
                 unit="count")

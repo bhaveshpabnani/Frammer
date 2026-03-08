@@ -11,6 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import FilterParams, get_db
+from app.registry.filters import build_where_clause
 from app.schemas.responses import ApiResponse, ForecastPoint, ForecastResponse
 from app.utils.response import build_metadata
 
@@ -41,20 +42,25 @@ async def get_forecast(
     Confidence interval = ±1 std-error of the regression residuals.
     """
     # ── Fetch monthly actuals ──────────────────────────────────────────────────
-    sql = text("""
+    where, params = build_where_clause(f)
+    # Always exclude rows with no upload timestamp
+    base_conditions = ["fv.uploaded_at IS NOT NULL"] + where
+    where_sql = "WHERE " + " AND ".join(base_conditions)
+
+    sql = text(f"""
         SELECT
-            EXTRACT(YEAR  FROM to_timestamp(uploaded_at))::int AS year,
-            EXTRACT(MONTH FROM to_timestamp(uploaded_at))::int AS month,
+            EXTRACT(YEAR  FROM to_timestamp(fv.uploaded_at))::int AS year,
+            EXTRACT(MONTH FROM to_timestamp(fv.uploaded_at))::int AS month,
             COUNT(*)                                            AS total_uploaded,
-            SUM(CASE WHEN published THEN 1 ELSE 0 END)         AS total_published,
-            COALESCE(SUM(uploaded_duration_sec),  0)/3600.0    AS uploaded_duration_hrs,
-            COALESCE(SUM(created_duration_sec),   0)/3600.0    AS created_duration_hrs
-        FROM fact_video
-        WHERE uploaded_at IS NOT NULL
+            SUM(CASE WHEN fv.published THEN 1 ELSE 0 END)         AS total_published,
+            COALESCE(SUM(fv.uploaded_duration_sec),  0)/3600.0    AS uploaded_duration_hrs,
+            COALESCE(SUM(fv.created_duration_sec),   0)/3600.0    AS created_duration_hrs
+        FROM fact_video fv
+        {where_sql}
         GROUP BY year, month
         ORDER BY year, month
     """)
-    result = await db.execute(sql)
+    result = await db.execute(sql, params)
     raw = result.mappings().all()
 
     if not raw:

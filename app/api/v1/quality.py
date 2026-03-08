@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import FilterParams, get_db
+from app.registry.filters import build_where_clause
 from app.schemas.responses import (
     ApiResponse,
     DQFieldReport,
@@ -48,13 +49,16 @@ def _severity(pct: float) -> str:
     return "ok"
 
 
-async def _total(db: AsyncSession) -> int:
-    return int((await db.execute(text("SELECT COUNT(*) FROM fact_video"))).scalar_one() or 0)
+async def _total(db: AsyncSession, where: list[str] | None = None, params: dict | None = None) -> int:
+    fv_where = ("WHERE " + " AND ".join(where)) if where else ""
+    return int((await db.execute(text(f"SELECT COUNT(*) FROM fact_video fv {fv_where}"), params or {})).scalar_one() or 0)
 
 
-async def _published_total(db: AsyncSession) -> int:
+async def _published_total(db: AsyncSession, where: list[str] | None = None, params: dict | None = None) -> int:
+    pub_clauses = (where or []) + ["fv.published = TRUE"]
+    fv_where = "WHERE " + " AND ".join(pub_clauses)
     return int(
-        (await db.execute(text("SELECT COUNT(*) FROM fact_video WHERE published = TRUE"))).scalar_one() or 0
+        (await db.execute(text(f"SELECT COUNT(*) FROM fact_video fv {fv_where}"), params or {})).scalar_one() or 0
     )
 
 
@@ -81,18 +85,21 @@ async def quality_summary(
     f: FilterParams = Depends(),
     db: AsyncSession = Depends(get_db),
 ) -> ApiResponse[QualitySummary]:
-    total = await _total(db)
+    where, params = build_where_clause(f)
+    fv_where = ("WHERE " + " AND ".join(where)) if where else ""
+    total = await _total(db, where, params)
 
-    dup_result = await db.execute(text("""
+    dup_result = await db.execute(text(f"""
         SELECT COALESCE(SUM(cnt - 1), 0)
         FROM (
             SELECT video_id, COUNT(*) AS cnt
-            FROM fact_video
-            WHERE video_id IS NOT NULL
+            FROM fact_video fv
+            {fv_where}
+            {'AND' if fv_where else 'WHERE'} video_id IS NOT NULL
             GROUP BY video_id
             HAVING COUNT(*) > 1
         ) dups
-    """))
+    """), params)
     duplicate_video_ids = int(dup_result.scalar_one() or 0)
 
     unk_result = await db.execute(text("""
@@ -105,12 +112,21 @@ async def quality_summary(
     score_total = 0.0
 
     for col, table in _CHECKED_COLUMNS:
-        res = await db.execute(text(f"""
-            SELECT
-                COUNT(*) FILTER (WHERE {col} IS NULL OR {col}::text = '') AS null_count,
-                COUNT(DISTINCT {col})                                      AS distinct_count
-            FROM {table}
-        """))
+        if table == "fact_video":
+            res = await db.execute(text(f"""
+                SELECT
+                    COUNT(*) FILTER (WHERE {col} IS NULL OR {col}::text = '') AS null_count,
+                    COUNT(DISTINCT {col})                                      AS distinct_count
+                FROM fact_video fv
+                {fv_where}
+            """), params)
+        else:
+            res = await db.execute(text(f"""
+                SELECT
+                    COUNT(*) FILTER (WHERE {col} IS NULL OR {col}::text = '') AS null_count,
+                    COUNT(DISTINCT {col})                                      AS distinct_count
+                FROM {table}
+            """))
         r = res.one()
         null_count     = int(r.null_count or 0)
         distinct_count = int(r.distinct_count or 0)
@@ -152,8 +168,7 @@ async def quality_summary(
     )
     return ApiResponse(data=data, meta=build_metadata(
         f, grain="rule-evaluated",
-        caveats=["Quality score = average of (100 - null_pct) across all checked columns",
-                 "DQ checks run against the full dataset and ignore date/dimension filters"],
+        caveats=["Quality score = average of (100 - null_pct) across all checked columns"],
         unit="percent",
     ))
 
@@ -186,7 +201,9 @@ async def quality_fields(
     db: AsyncSession = Depends(get_db),
 ) -> ApiResponse[List[DQFieldReport]]:
     """Per-field null rates and unknown / invalid value rates."""
-    total = await _total(db)
+    where, params = build_where_clause(f)
+    fv_where = ("WHERE " + " AND ".join(where)) if where else ""
+    total = await _total(db, where, params)
     dim_user_total = int(
         (await db.execute(text("SELECT COUNT(*) FROM dim_user"))).scalar_one() or 0
     )
@@ -199,13 +216,23 @@ async def quality_fields(
         unk_exp = cfg["unknown_expr"]
         row_count = total if table == "fact_video" else dim_user_total
 
-        null_sql = text(f"""
-            SELECT
-                COUNT(*) FILTER (WHERE {field} IS NULL OR {field}::text = '') AS null_count,
-                COUNT(DISTINCT {field})                                        AS distinct_count
-            FROM {table}
-        """)
-        r = (await db.execute(null_sql)).one()
+        if table == "fact_video":
+            null_sql = text(f"""
+                SELECT
+                    COUNT(*) FILTER (WHERE {field} IS NULL OR {field}::text = '') AS null_count,
+                    COUNT(DISTINCT {field})                                        AS distinct_count
+                FROM fact_video fv
+                {fv_where}
+            """)
+            r = (await db.execute(null_sql, params)).one()
+        else:
+            null_sql = text(f"""
+                SELECT
+                    COUNT(*) FILTER (WHERE {field} IS NULL OR {field}::text = '') AS null_count,
+                    COUNT(DISTINCT {field})                                        AS distinct_count
+                FROM {table}
+            """)
+            r = (await db.execute(null_sql)).one()
         null_count     = int(r.null_count or 0)
         distinct_count = int(r.distinct_count or 0)
         null_pct       = round(null_count * 100.0 / row_count, 2) if row_count else 0.0
@@ -233,7 +260,6 @@ async def quality_fields(
 
     return ApiResponse(data=results, meta=build_metadata(
         f, grain="rule-evaluated",
-        caveats=["Field-level DQ checks run against the full dataset; date/dimension filters are ignored"],
         unit="percent",
     ))
 
@@ -246,45 +272,53 @@ async def quality_trend(
     db: AsyncSession = Depends(get_db),
 ) -> ApiResponse[QualityTrendResponse]:
     """Month-over-month quality score trend + per-client null metrics."""
-    total     = await _total(db)
-    pub_total = await _published_total(db)
+    where, params = build_where_clause(f)
+    fv_where = ("WHERE " + " AND ".join(where)) if where else ""
+    pub_clauses = where + ["fv.published = TRUE"]
+    pub_where = "WHERE " + " AND ".join(pub_clauses)
+    total     = await _total(db, where, params)
+    pub_total = await _published_total(db, where, params)
 
-    inv_url = int((await db.execute(text("""
-        SELECT COUNT(*) FROM fact_video
-        WHERE published = TRUE
-          AND (published_url IS NULL OR published_url = '' OR published_url NOT LIKE 'http%')
-    """))).scalar_one() or 0)
+    inv_url = int((await db.execute(text(f"""
+        SELECT COUNT(*) FROM fact_video fv
+        {pub_where}
+          AND (fv.published_url IS NULL OR fv.published_url = '' OR fv.published_url NOT LIKE 'http%')
+    """), params)).scalar_one() or 0)
 
-    null_plat = int((await db.execute(text("""
-        SELECT COUNT(*) FROM fact_video
-        WHERE published = TRUE
-          AND (published_platform IS NULL OR published_platform = '')
-    """))).scalar_one() or 0)
+    null_plat = int((await db.execute(text(f"""
+        SELECT COUNT(*) FROM fact_video fv
+        {pub_where}
+          AND (fv.published_platform IS NULL OR fv.published_platform = '')
+    """), params)).scalar_one() or 0)
     null_platform_pct = round(null_plat / pub_total * 100, 2) if pub_total else 0.0
 
-    unk_lang = int((await db.execute(text("""
+    unk_lang = int((await db.execute(text(f"""
         SELECT COUNT(*) FROM fact_video fv
         LEFT JOIN dim_language dl ON dl.id = fv.language_id
-        WHERE fv.language_id IS NULL OR LOWER(dl.iso_code) IN ('unknown','unk','')
-    """))).scalar_one() or 0)
+        {fv_where}
+        {'AND' if fv_where else 'WHERE'} (fv.language_id IS NULL OR LOWER(dl.iso_code) IN ('unknown','unk',''))
+    """), params)).scalar_one() or 0)
     unk_lang_pct = round(unk_lang / total * 100, 2) if total else 0.0
 
-    unk_input = int((await db.execute(text("""
+    unk_input = int((await db.execute(text(f"""
         SELECT COUNT(*) FROM fact_video fv
         LEFT JOIN dim_input_type dit ON dit.id = fv.input_type_id
-        WHERE fv.input_type_id IS NULL OR LOWER(COALESCE(dit.name,'')) IN ('unknown','')
-    """))).scalar_one() or 0)
+        {fv_where}
+        {'AND' if fv_where else 'WHERE'} (fv.input_type_id IS NULL OR LOWER(COALESCE(dit.name,'')) IN ('unknown',''))
+    """), params)).scalar_one() or 0)
     unk_input_pct = round(unk_input / total * 100, 2) if total else 0.0
 
-    unk_output = int((await db.execute(text("""
+    unk_output = int((await db.execute(text(f"""
         SELECT COUNT(*) FROM fact_video fv
-        WHERE NOT EXISTS (
+        {fv_where}
+        {'AND' if fv_where else 'WHERE'} NOT EXISTS (
             SELECT 1 FROM fact_video_output_type fvot WHERE fvot.video_id = fv.id
         )
-    """))).scalar_one() or 0)
+    """), params)).scalar_one() or 0)
     unk_output_pct = round(unk_output / total * 100, 2) if total else 0.0
 
-    trend_sql = text("""
+    trend_and = (" AND " + " AND ".join(where)) if where else ""
+    trend_sql = text(f"""
         SELECT
             EXTRACT(YEAR  FROM to_timestamp(uploaded_at))::int AS yr,
             EXTRACT(MONTH FROM to_timestamp(uploaded_at))::int AS mo,
@@ -293,12 +327,12 @@ async def quality_trend(
             SUM(CASE WHEN user_id IS NULL     THEN 1 ELSE 0 END) AS null_usr,
             SUM(CASE WHEN language_id IS NULL THEN 1 ELSE 0 END) AS null_lang,
             SUM(CASE WHEN input_type_id IS NULL THEN 1 ELSE 0 END) AS null_inp
-        FROM fact_video
-        WHERE uploaded_at IS NOT NULL
+        FROM fact_video fv
+        WHERE uploaded_at IS NOT NULL{trend_and}
         GROUP BY yr, mo
         ORDER BY yr, mo
     """)
-    trend_rows = (await db.execute(trend_sql)).mappings().all()
+    trend_rows = (await db.execute(trend_sql, params)).mappings().all()
 
     trend: List[QualityTrendPoint] = []
     for r in trend_rows:
@@ -324,7 +358,7 @@ async def quality_trend(
             )
         )
 
-    by_client_sql = text("""
+    by_client_sql = text(f"""
         SELECT
             dc.name                                                         AS client_name,
             COUNT(fv.id)                                                    AS total,
@@ -339,10 +373,11 @@ async def quality_trend(
                      THEN 1 ELSE 0 END)                                     AS invalid_url_pub
         FROM fact_video fv
         JOIN dim_client dc ON dc.id = fv.client_id
+        {fv_where}
         GROUP BY dc.name
         ORDER BY total DESC
     """)
-    by_client_rows = (await db.execute(by_client_sql)).mappings().all()
+    by_client_rows = (await db.execute(by_client_sql, params)).mappings().all()
     by_client: List[Dict] = []
     for r in by_client_rows:
         cnt = int(r["total"] or 1)
@@ -368,8 +403,7 @@ async def quality_trend(
     )
     return ApiResponse(data=data, meta=build_metadata(
         f, grain="monthly-aggregated",
-        caveats=["Trend DQ score uses 4 core fields only (channel, user, language, input_type)",
-                 "by_client breakdown ignores date filters"],
+        caveats=["Trend DQ score uses 4 core fields only (channel, user, language, input_type)"],
         unit="percent",
     ))
 
@@ -388,6 +422,9 @@ async def quality_issues(
     db: AsyncSession = Depends(get_db),
 ) -> ApiResponse[List[DQIssueRow]]:
     """Returns rows with specific data quality issues."""
+    where, params = build_where_clause(f)
+    fv_filter_and = (" AND " + " AND ".join(where)) if where else ""
+    combined_params = {**params, "lim": limit}
     issues: List[DQIssueRow] = []
 
     def _row_to_issue(r: Any, cat: str, detail: str, sev: str) -> DQIssueRow:
@@ -417,10 +454,10 @@ async def quality_issues(
     if category in (None, "null_metadata"):
         rows = (await db.execute(text(f"""
             {select_cols} {base_join}
-            WHERE fv.channel_id IS NULL OR fv.user_id IS NULL
-               OR fv.language_id IS NULL OR fv.input_type_id IS NULL
+            WHERE (fv.channel_id IS NULL OR fv.user_id IS NULL
+               OR fv.language_id IS NULL OR fv.input_type_id IS NULL){fv_filter_and}
             LIMIT :lim
-        """), {"lim": limit})).mappings().all()
+        """), combined_params)).mappings().all()
         for r in rows:
             issues.append(_row_to_issue(r, "null_metadata",
                 "One or more of: channel_id, user_id, language_id, input_type_id is NULL", "warning"))
@@ -430,9 +467,9 @@ async def quality_issues(
             {select_cols} {base_join}
             WHERE fv.published = TRUE
               AND (fv.published_url IS NULL OR fv.published_url = ''
-                   OR fv.published_url NOT LIKE 'http%')
+                   OR fv.published_url NOT LIKE 'http%'){fv_filter_and}
             LIMIT :lim
-        """), {"lim": limit})).mappings().all()
+        """), combined_params)).mappings().all()
         for r in rows:
             issues.append(_row_to_issue(r, "invalid_url",
                 "Published row missing or invalid published_url", "critical"))
@@ -441,9 +478,9 @@ async def quality_issues(
         rows = (await db.execute(text(f"""
             {select_cols} {base_join}
             WHERE fv.published = TRUE
-              AND (fv.published_platform IS NULL OR fv.published_platform = '')
+              AND (fv.published_platform IS NULL OR fv.published_platform = ''){fv_filter_and}
             LIMIT :lim
-        """), {"lim": limit})).mappings().all()
+        """), combined_params)).mappings().all()
         for r in rows:
             issues.append(_row_to_issue(r, "missing_platform",
                 "Published row missing published_platform", "warning"))
@@ -451,9 +488,9 @@ async def quality_issues(
     if category in (None, "missing_team"):
         rows = (await db.execute(text(f"""
             {select_cols} {base_join}
-            WHERE LOWER(COALESCE(du.team_name,'')) IN ('unknown','')
+            WHERE LOWER(COALESCE(du.team_name,'')) IN ('unknown',''){fv_filter_and}
             LIMIT :lim
-        """), {"lim": limit})).mappings().all()
+        """), combined_params)).mappings().all()
         for r in rows:
             issues.append(_row_to_issue(r, "missing_team",
                 "User has no team_name or team_name is 'unknown'", "info"))
@@ -462,12 +499,12 @@ async def quality_issues(
         rows = (await db.execute(text(f"""
             {select_cols} {base_join}
             WHERE fv.video_id IN (
-                SELECT video_id FROM fact_video
-                WHERE video_id IS NOT NULL
+                SELECT video_id FROM fact_video fv2
+                WHERE video_id IS NOT NULL{fv_filter_and.replace('fv.', 'fv2.')}
                 GROUP BY video_id HAVING COUNT(*) > 1
             )
             LIMIT :lim
-        """), {"lim": limit})).mappings().all()
+        """), combined_params)).mappings().all()
         for r in rows:
             issues.append(_row_to_issue(r, "duplicate",
                 "video_id appears more than once in fact_video", "warning"))
@@ -476,9 +513,9 @@ async def quality_issues(
         rows = (await db.execute(text(f"""
             {select_cols} {base_join}
             WHERE fv.processed_at IS NOT NULL AND fv.uploaded_at IS NOT NULL
-              AND fv.processed_at < fv.uploaded_at
+              AND fv.processed_at < fv.uploaded_at{fv_filter_and}
             LIMIT :lim
-        """), {"lim": limit})).mappings().all()
+        """), combined_params)).mappings().all()
         for r in rows:
             issues.append(_row_to_issue(r, "timestamp_inconsistency",
                 "processed_at is earlier than uploaded_at", "critical"))
@@ -488,9 +525,9 @@ async def quality_issues(
               AND (
                 (fv.processed_at IS NOT NULL AND fv.published_at < fv.processed_at)
                 OR (fv.uploaded_at IS NOT NULL AND fv.published_at < fv.uploaded_at)
-              )
+              ){fv_filter_and}
             LIMIT :lim
-        """), {"lim": limit})).mappings().all()
+        """), combined_params)).mappings().all()
         for r in rows2:
             issues.append(_row_to_issue(r, "timestamp_inconsistency",
                 "published_at is earlier than processed_at or uploaded_at", "critical"))
@@ -498,11 +535,11 @@ async def quality_issues(
     if category in (None, "negative_duration"):
         rows = (await db.execute(text(f"""
             {select_cols} {base_join}
-            WHERE (fv.uploaded_duration_sec IS NOT NULL AND fv.uploaded_duration_sec < 0)
+            WHERE ((fv.uploaded_duration_sec IS NOT NULL AND fv.uploaded_duration_sec < 0)
                OR (fv.created_duration_sec  IS NOT NULL AND fv.created_duration_sec  < 0)
-               OR (fv.published_duration_sec IS NOT NULL AND fv.published_duration_sec < 0)
+               OR (fv.published_duration_sec IS NOT NULL AND fv.published_duration_sec < 0)){fv_filter_and}
             LIMIT :lim
-        """), {"lim": limit})).mappings().all()
+        """), combined_params)).mappings().all()
         for r in rows:
             issues.append(_row_to_issue(r, "negative_duration",
                 "One or more duration fields are negative", "critical"))
@@ -512,9 +549,9 @@ async def quality_issues(
             {select_cols} {base_join}
             WHERE NOT EXISTS (
                 SELECT 1 FROM fact_video_output_type fvot WHERE fvot.video_id = fv.id
-            )
+            ){fv_filter_and}
             LIMIT :lim
-        """), {"lim": limit})).mappings().all()
+        """), combined_params)).mappings().all()
         for r in rows:
             issues.append(_row_to_issue(r, "missing_bridge",
                 "No output type records in fact_video_output_type for this video", "info"))
@@ -522,8 +559,7 @@ async def quality_issues(
     return ApiResponse(data=issues[:limit], meta=build_metadata(
         f, grain="video-level",
         caveats=["Issue rows are sampled up to the limit parameter; "
-                 "full counts are available via /quality/rules",
-                 "Date/dimension filters are not applied to DQ issue queries"],
+                 "full counts are available via /quality/rules"],
     ))
 
 
@@ -535,8 +571,9 @@ async def quality_rules(
     db: AsyncSession = Depends(get_db),
 ) -> ApiResponse[DQRulesResponse]:
     """Evaluates all registered DQ rules and returns counts, percentages, and severity."""
-    total = await _total(db)
-    pub   = await _published_total(db)
+    where, params = build_where_clause(f)
+    total = await _total(db, where, params)
+    pub   = await _published_total(db, where, params)
 
     rules: List[DQRuleResult] = []
 
@@ -687,7 +724,6 @@ async def quality_rules(
             "R13 denominator is dim_user count, not fact_video count",
             "R19 denominator is fact_video_output_type row count",
             "Overall score penalises critical breaches 3× more than warnings",
-            "All rules run against the full dataset; date/dimension filters are not applied",
         ],
         unit="percent",
     ))

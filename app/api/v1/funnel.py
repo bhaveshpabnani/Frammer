@@ -133,7 +133,7 @@ async def funnel_by_segment(
         {
             "segment": r["seg"],
             "uploaded": int(r["uploaded"] or 0),
-            "processed": int(r["processed"] or 0) or int(r["uploaded"] or 0),
+            "processed": int(r["processed"] or 0),  # explicit 0 when none processed — no fallback to uploaded
             "published": int(r["published"] or 0),
             "publish_rate_pct": float(r["publish_rate_pct"] or 0),
         }

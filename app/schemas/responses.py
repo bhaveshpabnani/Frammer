@@ -320,6 +320,7 @@ class ClientSummaryRow(BaseModel):
     slug: str
     name: str
     total_uploaded: int
+    total_processed: int = 0
     total_published: int
     total_clips: int
     publish_rate: float
