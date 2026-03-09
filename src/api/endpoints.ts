@@ -1,5 +1,5 @@
 /** Typed API endpoint functions. */
-import { apiFetch, apiPost } from './client';
+import { apiFetch, apiPost, apiPostWithMeta } from './client';
 import type {
   KPIResponse,
   MonthlyRow,
@@ -38,6 +38,9 @@ import type {
   GrowthDriversResponse,
   PublishingPlatformCount,
   RegistryMetric,
+  AgentQueryRequest,
+  AgentPlanResponse,
+  AgentQueryResponse,
 } from './types';
 
 // Domain-prefixed canonical paths (Phase 4)
@@ -48,6 +51,7 @@ const FUNNEL  = '/api/v1/funnel-efficiency';
 const CONTENT = '/api/v1/content';
 const DIAG    = '/api/v1/diagnostics';
 const DETAIL  = '/api/v1/detail';
+const AGENT   = '/api/v1/agent';
 
 // ── Core ───────────────────────────────────────────────────────────────────────
 export const fetchKpis = (qs: string) =>
@@ -214,3 +218,9 @@ export const fetchVideoExplorer = (
 
 export const runQuery = (req: QueryRequest) =>
   apiPost<QueryResponse>(`${DETAIL}/query`, req);
+
+export const planAgentQuery = (req: AgentQueryRequest, qs = '') =>
+  apiPostWithMeta<AgentPlanResponse>(`${AGENT}/plan${qs ? '?' + qs : ''}`, req);
+
+export const runAgentQuery = (req: AgentQueryRequest, qs = '') =>
+  apiPostWithMeta<AgentQueryResponse>(`${AGENT}/query${qs ? '?' + qs : ''}`, req);
