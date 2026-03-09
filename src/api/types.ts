@@ -767,3 +767,123 @@ export interface RegistryDimension {
   is_direct: boolean;
   is_flag: boolean;
 }
+
+// ── Notifications ──────────────────────────────────────────────────────────────
+export type DigestType = 'leadership' | 'ops' | 'dq' | 'client_health' | 'manual_report';
+export type Frequency = 'daily' | 'weekly' | 'biweekly' | 'monthly';
+export type AlertRuleType =
+  | 'publish_conversion_drop'
+  | 'processed_published_gap'
+  | 'backlog_high'
+  | 'dq_score_low'
+  | 'missing_metadata_spike';
+export type ComparisonOperator = 'lt' | 'gt' | 'lte' | 'gte';
+
+export interface EmailSendResponse {
+  message_id: string | null;
+  status: string;
+}
+
+export interface SendReportRequest {
+  report_type: DigestType;
+  recipients: string[];
+  filters?: Record<string, unknown> | null;
+  client_id?: string | null;
+  subject?: string | null;
+}
+
+export interface SendTestEmailRequest {
+  recipient: string;
+}
+
+export interface SubscriptionCreate {
+  name: string;
+  report_type: DigestType;
+  recipients: string[];
+  frequency: Frequency;
+  timezone?: string;
+  filters?: Record<string, unknown> | null;
+  client_id?: string | null;
+}
+
+export interface SubscriptionUpdate {
+  name?: string;
+  recipients?: string[];
+  frequency?: Frequency;
+  timezone?: string;
+  filters?: Record<string, unknown> | null;
+  is_enabled?: boolean;
+}
+
+export interface SubscriptionResponse {
+  id: string;
+  name: string;
+  report_type: DigestType;
+  recipients: string[];
+  frequency: Frequency;
+  timezone: string;
+  filters: Record<string, unknown> | null;
+  client_id: string | null;
+  is_enabled: boolean;
+  created_by: string;
+  created_at: number;
+  updated_at: number;
+  last_run_at: number | null;
+}
+
+export interface AlertRuleCreate {
+  name: string;
+  rule_type: AlertRuleType;
+  filters?: Record<string, unknown> | null;
+  threshold_value: number;
+  comparison_operator: ComparisonOperator;
+  recipients: string[];
+  cooldown_minutes?: number;
+}
+
+export interface AlertRuleUpdate {
+  name?: string;
+  threshold_value?: number;
+  comparison_operator?: ComparisonOperator;
+  recipients?: string[];
+  cooldown_minutes?: number;
+  filters?: Record<string, unknown> | null;
+  is_enabled?: boolean;
+}
+
+export interface AlertRuleResponse {
+  id: string;
+  name: string;
+  rule_type: AlertRuleType;
+  filters: Record<string, unknown> | null;
+  threshold_value: number;
+  comparison_operator: ComparisonOperator;
+  recipients: string[];
+  cooldown_minutes: number;
+  is_enabled: boolean;
+  created_by: string;
+  created_at: number;
+  updated_at: number;
+  last_triggered_at: number | null;
+}
+
+export interface DeliveryLogResponse {
+  id: string;
+  report_type: string;
+  recipients_json: string;
+  status: string;
+  provider_message_id: string | null;
+  error_text: string | null;
+  payload_snapshot: string | null;
+  subscription_id: string | null;
+  alert_rule_id: string | null;
+  created_at: number;
+}
+
+export interface DeliveryLogPage {
+  items: DeliveryLogResponse[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}

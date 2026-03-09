@@ -41,6 +41,16 @@ import type {
   AgentQueryRequest,
   AgentPlanResponse,
   AgentQueryResponse,
+  EmailSendResponse,
+  SendReportRequest,
+  SendTestEmailRequest,
+  SubscriptionCreate,
+  SubscriptionUpdate,
+  SubscriptionResponse,
+  AlertRuleCreate,
+  AlertRuleUpdate,
+  AlertRuleResponse,
+  DeliveryLogPage,
 } from './types';
 
 // Domain-prefixed canonical paths (Phase 4)
@@ -224,3 +234,48 @@ export const planAgentQuery = (req: AgentQueryRequest, qs = '') =>
 
 export const runAgentQuery = (req: AgentQueryRequest, qs = '') =>
   apiPostWithMeta<AgentQueryResponse>(`${AGENT}/query${qs ? '?' + qs : ''}`, req);
+
+// ── Notifications ──────────────────────────────────────────────────────────────
+const NOTIF = '/api/v1/notifications';
+
+export const sendReport = (req: SendReportRequest) =>
+  apiPost<EmailSendResponse>(`${NOTIF}/email/send-report`, req);
+
+export const sendTestEmail = (req: SendTestEmailRequest) =>
+  apiPost<EmailSendResponse>(`${NOTIF}/email/send-test`, req);
+
+// Subscriptions
+export const fetchSubscriptions = () =>
+  apiFetch<SubscriptionResponse[]>(`${NOTIF}/subscriptions`);
+
+export const createSubscription = (body: SubscriptionCreate) =>
+  apiPost<SubscriptionResponse>(`${NOTIF}/subscriptions`, body);
+
+export const updateSubscription = (id: string, body: SubscriptionUpdate) =>
+  apiFetch<SubscriptionResponse>(`${NOTIF}/subscriptions/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+
+export const deleteSubscription = (id: string) =>
+  apiFetch<void>(`${NOTIF}/subscriptions/${id}`, { method: 'DELETE' });
+
+// Alert rules
+export const fetchAlertRules = () =>
+  apiFetch<AlertRuleResponse[]>(`${NOTIF}/alerts`);
+
+export const createAlertRule = (body: AlertRuleCreate) =>
+  apiPost<AlertRuleResponse>(`${NOTIF}/alerts`, body);
+
+export const updateAlertRule = (id: string, body: AlertRuleUpdate) =>
+  apiFetch<AlertRuleResponse>(`${NOTIF}/alerts/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+
+export const deleteAlertRule = (id: string) =>
+  apiFetch<void>(`${NOTIF}/alerts/${id}`, { method: 'DELETE' });
+
+// Delivery logs
+export const fetchDeliveryLogs = (page = 1, pageSize = 50) =>
+  apiFetch<DeliveryLogPage>(`${NOTIF}/delivery-logs?page=${page}&page_size=${pageSize}`);

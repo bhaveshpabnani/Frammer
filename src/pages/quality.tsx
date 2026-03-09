@@ -21,6 +21,7 @@ import {
 import { motion } from 'framer-motion';
 import {
   ShieldCheck, AlertTriangle, AlertCircle, CheckCircle2, ExternalLink, Search,
+  Mail, Bell, ShieldAlert,
 } from 'lucide-react';
 import { cn, downloadCsv } from '@/lib/utils';
 import {
@@ -30,6 +31,10 @@ import { EmptyState } from '@/components/EmptyState';
 import { SkeletonPage } from '@/components/SkeletonPage';
 import { ExportButton } from '@/components/ExportButton';
 import { InsightStrip, buildInsights } from '@/components/InsightStrip';
+import { Button } from '@/components/ui/button';
+import { EmailReportModal } from '@/components/EmailReportModal';
+import { SubscriptionModal } from '@/components/SubscriptionModal';
+import { AlertRuleModal } from '@/components/AlertRuleModal';
 
 const DarkTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
@@ -101,6 +106,9 @@ const Quality: React.FC = () => {
   const [activeTab, setActiveTab]            = useState('summary');
   const [issueCategory, setIssueCategory]   = useState<string>('all');
   const [issueSearch, setIssueSearch]       = useState('');
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [subModalOpen, setSubModalOpen]     = useState(false);
+  const [alertModalOpen, setAlertModalOpen] = useState(false);
 
   const { data: qualityData,   isLoading: summaryLoading }    = useQuality();
   const { data: extendedData,  isLoading: extendedLoading }   = useQualityExtended();
@@ -153,6 +161,19 @@ const Quality: React.FC = () => {
           badge={{ label: scoreRisk === 'ok' ? 'HEALTHY' : scoreRisk === 'warning' ? 'WARNING' : 'CRITICAL', variant: scoreRisk === 'ok' ? 'green' : 'red' }}
           onDownload={() => downloadCsv('frammer-data-quality', (fieldsData ?? []).map(f => ({ field: f.field, table: f.table, null_pct: f.null_pct, unknown_pct: f.unknown_pct, distinct_count: f.distinct_count, status: f.status })))}
         />
+
+        {/* Notification actions */}
+        <div className="flex gap-2 -mt-3">
+          <Button variant="outline" size="sm" className="gap-1.5 bg-[#111] border-[#1C1C1C] text-[#A1A1AA] hover:text-white" onClick={() => setEmailModalOpen(true)}>
+            <Mail className="h-3.5 w-3.5" /> Email Report
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1.5 bg-[#111] border-[#1C1C1C] text-[#A1A1AA] hover:text-white" onClick={() => setSubModalOpen(true)}>
+            <Bell className="h-3.5 w-3.5" /> Subscriptions
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1.5 bg-[#111] border-[#1C1C1C] text-[#A1A1AA] hover:text-white" onClick={() => setAlertModalOpen(true)}>
+            <ShieldAlert className="h-3.5 w-3.5" /> Alerts
+          </Button>
+        </div>
 
         {insights.length > 0 && <InsightStrip insights={insights} />}
 
@@ -457,6 +478,10 @@ const Quality: React.FC = () => {
         </Tabs>
 
       </div>
+
+      <EmailReportModal open={emailModalOpen} onOpenChange={setEmailModalOpen} />
+      <SubscriptionModal open={subModalOpen} onOpenChange={setSubModalOpen} />
+      <AlertRuleModal open={alertModalOpen} onOpenChange={setAlertModalOpen} />
     </DashboardLayout>
   );
 };
