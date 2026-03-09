@@ -39,7 +39,8 @@ jobs:
             --exclude='.venv' \
             --exclude='venv' \
             --exclude='.env' \
-            -czf frammer-release.tar.gz .
+            -czf /tmp/frammer-release.tar.gz .
+          mv /tmp/frammer-release.tar.gz frammer-release.tar.gz
 
       - name: Configure SSH key
         run: |
