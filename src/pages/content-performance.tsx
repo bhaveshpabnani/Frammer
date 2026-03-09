@@ -364,14 +364,14 @@ const ContentPerformance: React.FC = () => {
         {/* ── Type efficiency table ─────────────────────────────────────────────── */}
         <ChartCard
           title="Input Type Efficiency"
-          subtitle="Upload volume and hours — click to drill to Explorer"
-          height={280}
+          subtitle="Upload, publish, conversion rate and hours by input type — click to drill to Explorer"
+          height={320}
         >
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-[#1C1C1C]">
-                  {['Input Type', 'Uploaded', 'Hours', ''].map((h, i) => (
+                  {['Input Type', 'Uploaded', 'Published', 'Conv. Rate', 'Hours', ''].map((h, i) => (
                     <th key={i} className={cn('py-2 text-[#71717A] font-medium', i === 0 ? 'text-left pr-4' : 'text-right px-2')}>
                       {h}
                     </th>
@@ -379,29 +379,47 @@ const ContentPerformance: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {(inputTypes ?? []).slice(0, 15).map((row, i) => (
-                  <tr key={i} className="border-b border-[#111] hover:bg-[#0d0d0d] transition-colors">
-                    <td className="py-2 pr-4 text-[#E4E4E7]">{row.type}</td>
-                    <td className="py-2 px-2 text-right font-mono text-[#A1A1AA]">{row.count.toLocaleString()}</td>
-                    <td className="py-2 px-2 text-right font-mono text-[#A1A1AA]">{row.hours.toFixed(1)}h</td>
-                    <td className="py-2 pl-2">
-                      <button
-                        onClick={() => navigate(`/videos?inputType=${encodeURIComponent(row.type)}`)}
-                        className="text-[#52525B] hover:text-[#A1A1AA] transition-colors"
-                        title="View in Explorer"
-                      >
-                        <ArrowRight size={12} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {(inputTypes ?? []).slice(0, 15).map((row, i) => {
+                  const pub = row.published ?? 0;
+                  const convRate = row.count > 0 ? ((pub / row.count) * 100).toFixed(1) : '—';
+                  return (
+                    <tr
+                      key={i}
+                      className="border-b border-[#111] hover:bg-[#0d0d0d] transition-colors cursor-pointer"
+                      onClick={() => { updateFilters({ inputType: row.type }); navigate('/videos'); }}
+                    >
+                      <td className="py-2 pr-4 text-[#E4E4E7]">{row.type}</td>
+                      <td className="py-2 px-2 text-right font-mono text-[#A1A1AA]">{row.count.toLocaleString()}</td>
+                      <td className="py-2 px-2 text-right font-mono text-[#A1A1AA]">{pub.toLocaleString()}</td>
+                      <td className="py-2 px-2 text-right font-mono">
+                        <span className={cn(
+                          convRate === '—' ? 'text-[#52525B]' :
+                          parseFloat(convRate) >= 70 ? 'text-green-400' :
+                          parseFloat(convRate) >= 40 ? 'text-amber-400' : 'text-red-400',
+                        )}>
+                          {convRate === '—' ? '—' : `${convRate}%`}
+                        </span>
+                      </td>
+                      <td className="py-2 px-2 text-right font-mono text-[#71717A]">{row.hours.toFixed(1)}h</td>
+                      <td className="py-2 pl-2">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate(`/videos?inputType=${encodeURIComponent(row.type)}`); }}
+                          className="text-[#52525B] hover:text-[#A1A1AA] transition-colors"
+                          title="View in Explorer"
+                        >
+                          <ArrowRight size={12} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
           {inputTypes && (
             <div className="mt-3 flex justify-end">
               <ExportButton
-                data={inputTypes.map(r => ({ input_type: r.type, uploaded: r.count, hours: r.hours }))}
+                data={inputTypes.map(r => ({ input_type: r.type, uploaded: r.count, published: r.published ?? 0, conversion_pct: r.count > 0 ? ((r.published ?? 0) / r.count * 100).toFixed(1) : '0', hours: r.hours }))}
                 filename="input-types"
               />
             </div>
