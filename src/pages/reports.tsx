@@ -7,7 +7,7 @@ import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { FileText, Download, Printer, ChevronRight, TrendingUp, Clock, Video, BookOpen } from 'lucide-react';
+import { FileText, Download, Printer, ChevronRight, TrendingUp, Clock, Video, BookOpen, Mail, Bell, ShieldAlert } from 'lucide-react';
 import { CHART_COLORS } from '@/types';
 import { cn } from '@/lib/utils';
 import {
@@ -17,6 +17,9 @@ import {
 import { useFilters } from '@/contexts/FilterContext';
 import { apiFetchWithMeta } from '@/api/client';
 import type { ResponseMetadata } from '@/api/types';
+import { EmailReportModal } from '@/components/EmailReportModal';
+import { SubscriptionModal } from '@/components/SubscriptionModal';
+import { AlertRuleModal } from '@/components/AlertRuleModal';
 
 const TABS = ['Executive Summary', 'Trends', 'Channel', 'Language', 'Team', 'Metric Appendix'] as const;
 type Tab = typeof TABS[number];
@@ -49,6 +52,9 @@ function MetaFooter({ meta }: { meta?: ResponseMetadata | null }) {
 
 const Reports: React.FC = () => {
   const [activeTab, setActiveTab]         = useState<Tab>('Executive Summary');
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [subModalOpen, setSubModalOpen]     = useState(false);
+  const [alertModalOpen, setAlertModalOpen] = useState(false);
   const { filters }                       = useFilters();
 
   const { data: kpis }                    = useKpis();
@@ -147,6 +153,12 @@ const Reports: React.FC = () => {
             onDownload={handleExportJSON}
           />
           <div className="flex gap-2 shrink-0">
+            <Button variant="outline" size="sm" className="gap-1.5 bg-[#111] border-[#1C1C1C] text-[#A1A1AA] hover:text-white" onClick={() => setEmailModalOpen(true)}>
+              <Mail className="h-3.5 w-3.5" /> Email
+            </Button>
+            <Button variant="outline" size="sm" className="gap-1.5 bg-[#111] border-[#1C1C1C] text-[#A1A1AA] hover:text-white" onClick={() => setSubModalOpen(true)}>
+              <Bell className="h-3.5 w-3.5" /> Subscribe
+            </Button>
             <Button variant="outline" size="sm" className="gap-1.5 bg-[#111] border-[#1C1C1C]" onClick={handlePrint}>
               <Printer className="h-4 w-4" />
               Print
@@ -347,6 +359,10 @@ const Reports: React.FC = () => {
         )}
 
       </div>
+
+      <EmailReportModal open={emailModalOpen} onOpenChange={setEmailModalOpen} />
+      <SubscriptionModal open={subModalOpen} onOpenChange={setSubModalOpen} />
+      <AlertRuleModal open={alertModalOpen} onOpenChange={setAlertModalOpen} />
     </DashboardLayout>
   );
 };
