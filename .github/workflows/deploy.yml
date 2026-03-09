@@ -56,3 +56,7 @@ jobs:
       - name: Run deployment
         run: |
           ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'bash -s' < deploy.sh
+
+      - name: Health check
+        run: |
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'curl -fsS http://127.0.0.1:8000/health && echo "Health check passed"'

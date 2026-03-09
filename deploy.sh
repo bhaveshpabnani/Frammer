@@ -44,7 +44,7 @@ if [ -d "$SHARED_DIR/data" ]; then
 fi
 
 if [ -f "$RELEASE_DIR/alembic.ini" ] && [ -d "$RELEASE_DIR/alembic" ]; then
-  alembic -c "$RELEASE_DIR/alembic.ini" upgrade head
+  (cd "$RELEASE_DIR" && alembic -c alembic.ini upgrade head)
 fi
 
 ln -sfn "$RELEASE_DIR" "$CURRENT_LINK"
