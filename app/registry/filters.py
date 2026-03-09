@@ -50,24 +50,29 @@ if TYPE_CHECKING:
 # Private helpers
 # ---------------------------------------------------------------------------
 
-def _dim_filters(f: "FilterParams") -> tuple[list[str], dict]:
+def _dim_filters(f: "FilterParams", exclude_dimensions: set | None = None) -> tuple[list[str], dict]:
     """Build dimension-only WHERE clauses (client, channel, language … flags).
 
     Internal helper consumed by all three public builders.  All SQL
     expressions assume ``fv`` as the ``fact_video`` table alias and use
     correlated sub-selects so they work regardless of which dimension tables
     the outer query joins.
+
+    ``exclude_dimensions``: optional set of dimension names (e.g. {"user"})
+    to skip, useful for benchmark peer-group queries where the benchmarked
+    dimension should not be pre-filtered.
     """
+    skip = exclude_dimensions or set()
     where: list[str] = []
     params: dict = {}
 
-    if f.client:
+    if f.client and "client" not in skip:
         where.append(
             "fv.client_id = (SELECT id FROM dim_client WHERE slug = :client)"
         )
         params["client"] = f.client
 
-    if f.channel:
+    if f.channel and "channel" not in skip:
         where.append(
             "fv.channel_id IN ("
             "  SELECT id FROM dim_channel"
@@ -76,7 +81,7 @@ def _dim_filters(f: "FilterParams") -> tuple[list[str], dict]:
         )
         params["channel"] = f.channel
 
-    if f.language:
+    if f.language and "language" not in skip:
         where.append(
             "fv.language_id IN ("
             "  SELECT id FROM dim_language"
@@ -85,7 +90,7 @@ def _dim_filters(f: "FilterParams") -> tuple[list[str], dict]:
         )
         params["language"] = f.language
 
-    if f.team_member:
+    if f.team_member and "user" not in skip:
         where.append(
             "fv.user_id IN (SELECT id FROM dim_user WHERE name = :team_member)"
         )
@@ -158,13 +163,16 @@ def build_where_clause(
     return where, params
 
 
-def build_dim_only_where_clause(f: "FilterParams") -> tuple[list[str], dict]:
+def build_dim_only_where_clause(f: "FilterParams", exclude_dimensions: set | None = None) -> tuple[list[str], dict]:
     """Like ``build_where_clause`` but EXCLUDES date range filters.
 
     Useful for MoM growth queries and other queries that manage their own
     date windows and only want dimension-scoping applied globally.
+
+    ``exclude_dimensions``: forwarded to ``_dim_filters`` to skip specific
+    dimension filters (e.g. {"user"} when building benchmark peer groups).
     """
-    return _dim_filters(f)
+    return _dim_filters(f, exclude_dimensions=exclude_dimensions)
 
 
 def build_compare_where_clause(

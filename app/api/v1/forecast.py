@@ -1,4 +1,4 @@
-"""GET /api/v1/forecast/{metric} — linear trend forecast."""
+"""GET /api/v1/forecast/{metric} — Holt-Winters ETS forecast."""
 from __future__ import annotations
 
 import math
@@ -6,7 +6,6 @@ from typing import List, Literal, Optional
 
 import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, Query
-from scipy.stats import linregress  # type: ignore[import]
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -70,18 +69,55 @@ async def get_forecast(
     history = list(raw)[-12:]
 
     actuals = [float(r[metric]) for r in history]
-    xs = list(range(len(actuals)))
 
     if len(actuals) < 2:
         raise HTTPException(status_code=422, detail="Not enough data for forecasting.")
 
-    # ── Linear regression ──────────────────────────────────────────────────────
-    slope, intercept, r_value, _, std_err = linregress(xs, actuals)
-    residuals = [actuals[i] - (slope * i + intercept) for i in xs]
-    sigma = float(np.std(residuals))
+    # ── Holt-Winters ETS model ─────────────────────────────────────────────────
+    #   >= 24 pts → additive trend + additive seasonality (period=12)
+    #   6-23 pts  → additive trend only (no seasonality)
+    #   2-5 pts   → simple exponential smoothing (fallback)
+    n = len(actuals)
+    series = np.array(actuals, dtype=float)
+    model_type: str
 
-    model_confidence = round(max(0.0, min(1.0, r_value ** 2)), 3)
-    mom_growth = round((slope / max(1, abs(actuals[-1]))) * 100, 2) if actuals else 0.0
+    try:
+        from statsmodels.tsa.holtwinters import ExponentialSmoothing  # type: ignore[import]
+
+        if n >= 24:
+            model = ExponentialSmoothing(series, trend="add", seasonal="add", seasonal_periods=12, initialization_method="estimated")
+            model_type = "Holt-Winters (trend + seasonality, period=12)"
+        elif n >= 6:
+            model = ExponentialSmoothing(series, trend="add", seasonal=None, initialization_method="estimated")
+            model_type = "Holt-Winters (trend only)"
+        else:
+            model = ExponentialSmoothing(series, trend=None, seasonal=None, initialization_method="estimated")
+            model_type = "Simple exponential smoothing (< 6 data points)"
+
+        fit = model.fit(optimized=True)
+        forecasted = fit.forecast(horizon)
+        residuals = fit.resid
+        sigma = float(np.std(residuals))
+
+        # In-sample R² from residuals vs actuals
+        ss_res = float(np.sum(residuals ** 2))
+        ss_tot = float(np.sum((series - series.mean()) ** 2))
+        model_confidence = round(max(0.0, min(1.0, 1 - ss_res / ss_tot)) if ss_tot > 0 else 0.0, 3)
+
+    except Exception:
+        # Ultimate fallback: linear extrapolation
+        xs = list(range(n))
+        from scipy.stats import linregress as _linreg  # type: ignore[import]
+        slope, intercept, r_value, _, _ = _linreg(xs, actuals)
+        residuals_lin = [actuals[i] - (slope * i + intercept) for i in xs]
+        sigma = float(np.std(residuals_lin))
+        forecasted = np.array([slope * (n - 1 + h) + intercept for h in range(1, horizon + 1)])
+        model_confidence = round(r_value ** 2, 3)
+        model_type = "Linear regression (fallback)"
+
+    mom_growth = 0.0
+    if actuals[-1] > 0 and horizon > 0:
+        mom_growth = round(((float(forecasted[0]) - actuals[-1]) / actuals[-1]) * 100, 2)
 
     # ── Build response ─────────────────────────────────────────────────────────
     points: List[ForecastPoint] = []
@@ -108,16 +144,15 @@ async def get_forecast(
         if mo > 12:
             mo = 1
             yr += 1
-        x_val = len(actuals) - 1 + h
-        predicted = slope * x_val + intercept
+        predicted = float(forecasted[h - 1])
         upper = predicted + 1.96 * sigma
-        lower = max(0, predicted - 1.96 * sigma)
+        lower = max(0.0, predicted - 1.96 * sigma)
         points.append(
             ForecastPoint(
                 month_label=f"{_MONTH_LABELS[mo]} {str(yr)[2:]}",
                 year=yr,
                 month=mo,
-                forecast=round(max(0, predicted), 2),
+                forecast=round(max(0.0, predicted), 2),
                 upper=round(upper, 2),
                 lower=round(lower, 2),
                 is_forecast=True,
@@ -139,10 +174,10 @@ async def get_forecast(
             metrics=[metric],
             grain="monthly-aggregated",
             caveats=[
-                "Forecast uses OLS linear regression on the last 12 months of actuals",
-                "Confidence interval = ±1.96 standard errors of regression residuals",
+                f"Forecast model: {model_type}",
+                "Confidence interval = ±1.96 × in-sample residual std dev",
+                "Seasonal decomposition requires ≥ 24 months of data; trend-only model used when 6–23 months available",
                 "Model confidence (R²) below 0.5 indicates low predictive reliability",
-                "Forecast does not account for seasonality or structural breaks",
             ],
             unit="count" if "duration" not in metric else "hours",
         ),

@@ -30,7 +30,11 @@ async def get_duration_buckets(
             SELECT
                 CASE
                     WHEN fv.uploaded_duration_sec IS NULL OR fv.uploaded_duration_sec = 0 THEN 'Unknown'
-                    WHEN fv.uploaded_duration_sec < 1800                               THEN '< 30 min'
+                    WHEN fv.uploaded_duration_sec < 300                                THEN '0-5 min'
+                    WHEN fv.uploaded_duration_sec < 600                                THEN '5-10 min'
+                    WHEN fv.uploaded_duration_sec < 900                                THEN '10-15 min'
+                    WHEN fv.uploaded_duration_sec < 1200                               THEN '15-20 min'
+                    WHEN fv.uploaded_duration_sec < 1800                               THEN '20-30 min'
                     WHEN fv.uploaded_duration_sec < 3600                               THEN '30-60 min'
                     WHEN fv.uploaded_duration_sec < 7200                               THEN '1-2 hrs'
                     WHEN fv.uploaded_duration_sec < 14400                              THEN '2-4 hrs'
@@ -43,13 +47,17 @@ async def get_duration_buckets(
         GROUP BY range
         ORDER BY
             CASE range
-                WHEN '< 30 min'  THEN 1
-                WHEN '30-60 min' THEN 2
-                WHEN '1-2 hrs'   THEN 3
-                WHEN '2-4 hrs'   THEN 4
-                WHEN '4-8 hrs'   THEN 5
-                WHEN '> 8 hrs'   THEN 6
-                ELSE 7
+                WHEN '0-5 min'   THEN 1
+                WHEN '5-10 min'  THEN 2
+                WHEN '10-15 min' THEN 3
+                WHEN '15-20 min' THEN 4
+                WHEN '20-30 min' THEN 5
+                WHEN '30-60 min' THEN 6
+                WHEN '1-2 hrs'   THEN 7
+                WHEN '2-4 hrs'   THEN 8
+                WHEN '4-8 hrs'   THEN 9
+                WHEN '> 8 hrs'   THEN 10
+                ELSE 11
             END
     """)
 

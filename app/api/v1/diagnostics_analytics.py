@@ -119,7 +119,16 @@ async def _build_benchmark(
     """
     where, params = build_where_clause(f)
 
-    dim_where, dim_params = build_dim_only_where_clause(f)
+    # Exclude the benchmarked dimension's filter so the peer group contains
+    # all members (e.g. when benchmarking "user", don't filter to only 1 user)
+    _DIMENSION_SKIP_MAP = {
+        "user":     {"user"},
+        "channel":  {"channel"},
+        "client":   {"client"},
+        "language": {"language"},
+    }
+    skip_dims = _DIMENSION_SKIP_MAP.get(dimension, set())
+    dim_where, dim_params = build_dim_only_where_clause(f, exclude_dimensions=skip_dims)
 
     if f.date_to:
         ref_yr, ref_mo = f.date_to.year, f.date_to.month

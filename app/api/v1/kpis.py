@@ -124,19 +124,30 @@ async def get_kpis(
     """)
     top_language = (await db.execute(top_lang_sql, all_params)).scalar_one_or_none() or ""
 
-    # ── DQ score ───────────────────────────────────────────────────────────────
+    # ── DQ score ─────────────────────────────────────────────────────────────
+    # Uses the same 12-column formula as /quality/summary for consistency.
     try:
-        dq_sql = text("""
-            SELECT 100.0 - (
-                (SUM(CASE WHEN channel_id IS NULL THEN 1 ELSE 0 END)::float / NULLIF(COUNT(*),0) * 25)
-              + (SUM(CASE WHEN user_id IS NULL THEN 1 ELSE 0 END)::float / NULLIF(COUNT(*),0) * 25)
-              + (SUM(CASE WHEN language_id IS NULL THEN 1 ELSE 0 END)::float / NULLIF(COUNT(*),0) * 25)
-              + (SUM(CASE WHEN input_type_id IS NULL THEN 1 ELSE 0 END)::float / NULLIF(COUNT(*),0) * 25)
-            ) AS dq_score
-            FROM fact_video
+        dq_columns = [
+            "video_id", "headline", "source_url", "channel_id", "user_id",
+            "language_id", "input_type_id", "uploaded_at", "published_platform",
+            "published_url", "uploaded_duration_sec", "created_duration_sec",
+        ]
+        col_exprs = ", ".join(
+            f"SUM(CASE WHEN {col} IS NULL OR {col}::text = '' THEN 1 ELSE 0 END)::float / NULLIF(COUNT(*),0) AS np_{i}"
+            for i, col in enumerate(dq_columns)
+        )
+        dq_sql = text(f"""
+            SELECT {col_exprs}
+            FROM fact_video fv
+            {where_sql}
         """)
         async with db.begin_nested():
-            dq_score = round(float((await db.execute(dq_sql)).scalar_one() or 0), 1)
+            dq_row = (await db.execute(dq_sql, all_params)).mappings().one()
+        score_total = sum(
+            max(0.0, 100.0 - float(dq_row[f"np_{i}"] or 0) * 100)
+            for i in range(len(dq_columns))
+        )
+        dq_score = round(score_total / len(dq_columns), 1)
     except Exception:
         dq_score = 0.0
 

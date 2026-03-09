@@ -107,6 +107,10 @@ class FilterParams:
     def __init__(
         self,
         date_range:        str            = Query(default="all",  alias="dateRange"),
+        date_from_raw:     Optional[date] = Query(default=None, alias="dateFrom",
+                                                  description="Explicit start date (YYYY-MM-DD) for custom ranges"),
+        date_to_raw:       Optional[date] = Query(default=None, alias="dateTo",
+                                                  description="Explicit end date (YYYY-MM-DD) for custom ranges"),
         client:            Optional[str]  = Query(default=None),
         channel:           Optional[str]  = Query(default=None),
         language:          Optional[str]  = Query(default=None),
@@ -145,6 +149,12 @@ class FilterParams:
             # Unknown slug → no date filter
             self.date_from = None
             self.date_to = None
+
+        # Explicit date_from/date_to override the named range
+        if date_from_raw is not None:
+            self.date_from = date_from_raw
+        if date_to_raw is not None:
+            self.date_to = date_to_raw
 
         # ── Comparison period ─────────────────────────────────────────────────
         # Normalise compare_mode; only accept valid values when a main date range is set.

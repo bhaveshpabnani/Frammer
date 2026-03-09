@@ -139,6 +139,16 @@ async def get_lag(
 
 # ── /lag/sla-breaches ──────────────────────────────────────────────────────────
 
+# Best-effort lag expression: prefer stored column, fall back to timestamp diff
+_SLA_LAG_EXPR = """COALESCE(
+            fv.total_cycle_lag_sec,
+            CASE WHEN fv.published_at IS NOT NULL AND fv.uploaded_at IS NOT NULL
+                 THEN fv.published_at - fv.uploaded_at ELSE NULL END,
+            fv.processing_lag_sec,
+            CASE WHEN fv.processed_at IS NOT NULL AND fv.uploaded_at IS NOT NULL
+                 THEN fv.processed_at - fv.uploaded_at ELSE NULL END
+        )"""
+
 @router.get("/sla-breaches", response_model=ApiResponse[SLABreachResponse])
 async def lag_sla_breaches(
     sla_days: float = Query(default=7.0, ge=0.1,
@@ -159,7 +169,7 @@ async def lag_sla_breaches(
 
     ov_sql = text(f"""
         SELECT
-            COUNT(*) FILTER (WHERE COALESCE(fv.total_cycle_lag_sec, fv.processing_lag_sec) > :sla_secs) AS breach,
+            COUNT(*) FILTER (WHERE {_SLA_LAG_EXPR} > :sla_secs) AS breach,
             COUNT(*) AS total
         FROM fact_video fv
         {where_sql}
@@ -172,9 +182,9 @@ async def lag_sla_breaches(
     ch_sql = text(f"""
         SELECT
             dc.name AS seg,
-            COUNT(*) FILTER (WHERE COALESCE(fv.total_cycle_lag_sec, fv.processing_lag_sec) > :sla_secs) AS breach,
+            COUNT(*) FILTER (WHERE {_SLA_LAG_EXPR} > :sla_secs) AS breach,
             COUNT(*) AS total,
-            ROUND(AVG(COALESCE(fv.total_cycle_lag_sec, fv.processing_lag_sec)) / 60.0, 1) AS avg_lag_min
+            ROUND(AVG({_SLA_LAG_EXPR}) / 60.0, 1) AS avg_lag_min
         FROM fact_video fv
         JOIN dim_channel dc ON dc.id = fv.channel_id
         {where_sql}
@@ -199,9 +209,9 @@ async def lag_sla_breaches(
     usr_sql = text(f"""
         SELECT
             du.name AS seg,
-            COUNT(*) FILTER (WHERE COALESCE(fv.total_cycle_lag_sec, fv.processing_lag_sec) > :sla_secs) AS breach,
+            COUNT(*) FILTER (WHERE {_SLA_LAG_EXPR} > :sla_secs) AS breach,
             COUNT(*) AS total,
-            ROUND(AVG(COALESCE(fv.total_cycle_lag_sec, fv.processing_lag_sec)) / 60.0, 1) AS avg_lag_min
+            ROUND(AVG({_SLA_LAG_EXPR}) / 60.0, 1) AS avg_lag_min
         FROM fact_video fv
         JOIN dim_user du ON du.id = fv.user_id
         {where_sql}
@@ -226,9 +236,9 @@ async def lag_sla_breaches(
     cl_sql = text(f"""
         SELECT
             dcl.name AS seg,
-            COUNT(*) FILTER (WHERE COALESCE(fv.total_cycle_lag_sec, fv.processing_lag_sec) > :sla_secs) AS breach,
+            COUNT(*) FILTER (WHERE {_SLA_LAG_EXPR} > :sla_secs) AS breach,
             COUNT(*) AS total,
-            ROUND(AVG(COALESCE(fv.total_cycle_lag_sec, fv.processing_lag_sec)) / 60.0, 1) AS avg_lag_min
+            ROUND(AVG({_SLA_LAG_EXPR}) / 60.0, 1) AS avg_lag_min
         FROM fact_video fv
         JOIN dim_client dcl ON dcl.id = fv.client_id
         {where_sql}
