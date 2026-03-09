@@ -39,10 +39,6 @@ fi
 
 ln -sfn "$SHARED_DIR/.env" "$RELEASE_DIR/.env"
 
-if [ -d "$SHARED_DIR/data" ]; then
-  ln -sfn "$SHARED_DIR/data" "$RELEASE_DIR/data"
-fi
-
 if [ -f "$RELEASE_DIR/alembic.ini" ] && [ -d "$RELEASE_DIR/alembic" ]; then
   echo "Running database migrations..."
   if (cd "$RELEASE_DIR" && alembic -c alembic.ini upgrade head); then

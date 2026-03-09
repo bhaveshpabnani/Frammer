@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from functools import lru_cache
 from typing import List
 
@@ -47,13 +46,6 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> List[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
 
-    # ── CSV Data ───────────────────────────────────────────────────────────────
-    CSV_DATA_PATH: str = "../Frammer Data"
-
-    @property
-    def csv_path(self) -> str:
-        """Resolved absolute path to the CSV data folder."""
-        return os.path.abspath(self.CSV_DATA_PATH)
 
 
 @lru_cache
