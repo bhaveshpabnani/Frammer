@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -16,11 +16,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Bell, Settings, LogOut, User, CalendarRange, ChevronDown } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Bell, Settings, LogOut, User, CalendarRange, ChevronDown, Calendar as CalendarIcon } from 'lucide-react';
+import { format } from 'date-fns';
+import type { DateRange } from 'react-day-picker';
 import { cn } from '@/lib/utils';
 import { useFilters } from '@/contexts/FilterContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useDimensions } from '@/hooks/useApi';
 
 const DATE_RANGES = [
   { value: 'last_7d', label: 'Last 7 days' },
@@ -29,15 +34,8 @@ const DATE_RANGES = [
   { value: 'this_month', label: 'This month' },
   { value: 'last_month', label: 'Last month' },
   { value: 'ytd', label: 'Year to date' },
+  { value: 'all_data', label: 'All data' },
   { value: 'custom', label: 'Custom range' },
-];
-
-const CLIENTS = [
-  { value: 'all', label: 'All clients' },
-  { value: 'techcorp', label: 'TechCorp' },
-  { value: 'mediahub', label: 'MediaHub' },
-  { value: 'startupxyz', label: 'StartupXYZ' },
-  { value: 'globalco', label: 'GlobalCo' },
 ];
 
 interface HeaderProps {
@@ -49,11 +47,47 @@ export const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
   const { filters, updateFilters } = useFilters();
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const { data: dimensions } = useDimensions();
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [pendingRange, setPendingRange] = useState<DateRange | undefined>(
+    filters.customDateFrom && filters.customDateTo
+      ? { from: new Date(filters.customDateFrom), to: new Date(filters.customDateTo) }
+      : undefined
+  );
 
   const handleSignOut = async () => {
     await signOut();
     navigate('/login', { replace: true });
   };
+
+  const handleDateRangeChange = (value: string) => {
+    if (value !== 'custom') {
+      updateFilters({ dateRange: value, customDateFrom: null, customDateTo: null });
+    } else {
+      updateFilters({ dateRange: value });
+    }
+  };
+
+  const handleCalendarSelect = (range: DateRange | undefined) => {
+    setPendingRange(range);
+    if (range?.from && range?.to) {
+      updateFilters({
+        customDateFrom: format(range.from, 'yyyy-MM-dd'),
+        customDateTo: format(range.to, 'yyyy-MM-dd'),
+      });
+      setCalendarOpen(false);
+    }
+  };
+
+  const clientOptions = [
+    { value: 'all', label: 'All clients' },
+    ...(dimensions?.clients ?? []).map((c) => ({ value: c.value, label: c.label })),
+  ];
+
+  const customDateLabel =
+    filters.customDateFrom && filters.customDateTo
+      ? `${format(new Date(filters.customDateFrom), 'MMM d')} – ${format(new Date(filters.customDateTo), 'MMM d, y')}`
+      : 'Custom range';
 
   const userEmail = user?.email ?? '';
   const displayName = user?.user_metadata?.full_name ?? userEmail.split('@')[0] ?? 'User';
@@ -87,7 +121,7 @@ export const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="bg-[#161616] border-[#27272A]">
-              {CLIENTS.map((c) => (
+              {clientOptions.map((c) => (
                 <SelectItem key={c.value} value={c.value} className="text-xs text-[#A1A1AA] focus:text-white focus:bg-white/8">
                   {c.label}
                 </SelectItem>
@@ -96,7 +130,7 @@ export const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
           </Select>
 
           {/* Date range */}
-          <Select value={filters.dateRange} onValueChange={(v) => updateFilters({ dateRange: v })}>
+          <Select value={filters.dateRange} onValueChange={handleDateRangeChange}>
             <SelectTrigger
               className={cn(
                 'h-8 text-xs bg-[#111111] border-[#27272A] text-[#A1A1AA] hover:border-[#3F3F46] hover:text-white',
@@ -114,6 +148,35 @@ export const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
               ))}
             </SelectContent>
           </Select>
+
+          {/* Custom date calendar — shows only when custom is selected */}
+          {filters.dateRange === 'custom' && (
+            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  className={cn(
+                    'inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-medium',
+                    'bg-[#111111] border text-[#A1A1AA] hover:border-[#3F3F46] hover:text-white transition-all',
+                    filters.customDateFrom ? 'border-frammer-red/40 text-white' : 'border-[#27272A]'
+                  )}
+                >
+                  <CalendarIcon className="w-3.5 h-3.5 shrink-0" />
+                  <span className="max-w-36 truncate">{customDateLabel}</span>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 bg-[#161616] border-[#27272A]" align="start">
+                <Calendar
+                  initialFocus
+                  mode="range"
+                  defaultMonth={pendingRange?.from}
+                  selected={pendingRange}
+                  onSelect={handleCalendarSelect}
+                  numberOfMonths={2}
+                  className="text-white"
+                />
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
 
         {/* Right: Actions + Avatar */}

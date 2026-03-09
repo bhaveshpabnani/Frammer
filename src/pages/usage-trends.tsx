@@ -806,7 +806,7 @@ const UsageTrends: React.FC = () => {
             <ComposedChart data={rawTrend}>
               <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
               <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#71717A' }} />
-              <YAxis tick={{ fontSize: 11, fill: '#71717A' }} unit="%" domain={[0, 100]} />
+              <YAxis tick={{ fontSize: 11, fill: '#71717A' }} unit="%" domain={([dataMin, dataMax]: [number, number]) => [Math.max(0, dataMin * 0.8), Math.min(100, dataMax * 1.2)]} />
               <Tooltip content={<DarkTooltip unit="%" />} />
               <ReferenceLine y={50} stroke="#52525B" strokeDasharray="4 2" label={{ value: '50%', fill: '#52525B', fontSize: 10 }} />
               <Area
