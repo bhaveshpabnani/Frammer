@@ -9,6 +9,12 @@ export interface ResponseMetadata {
   caveats: string[];
   unit?: string;
   currency?: string;
+  planner_source?: string | null;
+  planner_model?: string | null;
+  planner_confidence?: number | null;
+  planner_fallback_reason?: string | null;
+  cache_hit?: boolean | null;
+  audit_id?: string | null;
 }
 
 export interface ApiResponse<T> {
@@ -361,6 +367,98 @@ export interface QueryResponse {
   rows: unknown[][];
   row_count: number;
   execution_time_ms: number;
+}
+
+export interface AgentSortRule {
+  field: string;
+  direction: 'asc' | 'desc';
+}
+
+export interface AgentChartRequest {
+  type: 'auto' | 'bar' | 'line' | 'area' | 'table' | 'stat' | 'pie';
+  x?: string | null;
+  y?: string | null;
+  series: string[];
+  title?: string | null;
+}
+
+export interface AgentPlan {
+  intent:
+    | 'single_kpi'
+    | 'trend'
+    | 'breakdown'
+    | 'comparison'
+    | 'top_n'
+    | 'diagnostic'
+    | 'raw_table'
+    | 'explain_metric';
+  metrics: string[];
+  dimensions: string[];
+  filters: Record<string, unknown>;
+  time_grain: 'day' | 'week' | 'month' | 'quarter' | 'year' | 'all';
+  compare_mode?: 'previous_period' | 'previous_month' | 'previous_year' | null;
+  order_by: AgentSortRule[];
+  limit: number;
+  chart?: AgentChartRequest | null;
+  explanation_level: 'short' | 'normal' | 'detailed';
+}
+
+export interface AgentValidationIssue {
+  field: string;
+  code: string;
+  message: string;
+}
+
+export interface AgentChartSpec {
+  chart_type: 'bar' | 'line' | 'area' | 'table' | 'stat' | 'pie';
+  x?: string | null;
+  y?: string | null;
+  series: string[];
+  title?: string | null;
+  dataset_columns: string[];
+  formatters: Record<string, string>;
+}
+
+export interface AgentQueryRequest {
+  question: string;
+  conversation_id?: string | null;
+  context?: Record<string, unknown>;
+  plan?: AgentPlan | null;
+}
+
+export interface AgentPlanResponse {
+  question: string;
+  interpreted_question: string;
+  plan: AgentPlan;
+  resolved_filters: Record<string, unknown>;
+  planner_source: 'openai' | 'deterministic' | 'supplied_plan';
+  planner_model?: string | null;
+  planner_confidence?: number | null;
+  planner_fallback_reason?: string | null;
+  caveats: string[];
+  follow_ups: string[];
+  validation_issues: AgentValidationIssue[];
+}
+
+export interface AgentQueryResponse {
+  question: string;
+  interpreted_question: string;
+  plan: AgentPlan;
+  resolved_filters: Record<string, unknown>;
+  planner_source: 'openai' | 'deterministic' | 'supplied_plan';
+  planner_model?: string | null;
+  planner_confidence?: number | null;
+  planner_fallback_reason?: string | null;
+  sql?: string | null;
+  sql_params: Record<string, unknown>;
+  columns: string[];
+  rows: unknown[][];
+  chart_spec?: AgentChartSpec | null;
+  summary: string;
+  caveats: string[];
+  follow_ups: string[];
+  execution_time_ms: number;
+  row_count: number;
 }
 
 // ── Funnel ────────────────────────────────────────────────────────────────────
