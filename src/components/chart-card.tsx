@@ -78,7 +78,7 @@ export const ChartCard: React.FC<ChartCardProps> = ({
 
       {/* Chart body */}
       <div className="flex-1 px-4 py-3">
-        <div style={{ height, width: '100%' }} className="overflow-hidden">
+        <div style={{ height, width: '100%' }} className={cn(height !== 'auto' && 'overflow-hidden')}>
           {children}
         </div>
       </div>
