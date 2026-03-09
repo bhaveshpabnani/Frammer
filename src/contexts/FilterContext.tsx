@@ -8,6 +8,8 @@ export interface ComparisonState {
 
 export interface FilterState {
   dateRange: string;
+  customDateFrom: string | null;
+  customDateTo: string | null;
   client: string;
   channel: string;
   language: string;
@@ -30,6 +32,8 @@ export interface FilterContextValue {
 
 const DEFAULT_FILTERS: FilterState = {
   dateRange: 'last_30d',
+  customDateFrom: null,
+  customDateTo: null,
   client: 'all',
   channel: 'all',
   language: 'all',

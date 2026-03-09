@@ -231,7 +231,7 @@ const ChannelAnalytics: React.FC = () => {
                     tick={{ fill: '#71717A', fontSize: 11 }}
                     axisLine={false}
                     tickLine={false}
-                    domain={[0, 100]}
+                    domain={([dataMin, dataMax]: [number, number]) => [Math.max(0, dataMin * 0.8), Math.min(100, dataMax * 1.2)]}
                     tickFormatter={v => `${v}%`}
                   />
                   <ZAxis dataKey="health_score" range={[40, 220]} name="Health Score" />

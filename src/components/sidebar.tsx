@@ -125,7 +125,6 @@ const navGroups = [
   {
     label: 'AI & Insights',
     items: [
-      { href: '/ai', icon: <Bot size={18} />, label: 'AI Analytics', badge: 'AI', badgeVariant: 'blue' as const },
       { href: '/forecasting', icon: <TrendingDown size={18} />, label: 'Forecasting' },
     ],
   },

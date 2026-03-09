@@ -5,63 +5,9 @@ import { useFilters } from '@/contexts/FilterContext';
 import { FilterChip } from './FilterChip';
 import { FilterDropdown } from './FilterDropdown';
 import { ComparisonToggle } from './ComparisonToggle';
+import { useDimensions } from '@/hooks/useApi';
 
-const CLIENT_OPTIONS = [
-  { value: 'all', label: 'All Clients' },
-  { value: 'techcorp', label: 'TechCorp' },
-  { value: 'mediahub', label: 'MediaHub' },
-  { value: 'startupxyz', label: 'StartupXYZ' },
-  { value: 'globalco', label: 'GlobalCo' },
-  { value: 'brandlabs', label: 'BrandLabs' },
-];
-
-const CHANNEL_OPTIONS = [
-  { value: 'all', label: 'All Channels' },
-  { value: 'youtube', label: 'YouTube' },
-  { value: 'instagram', label: 'Instagram' },
-  { value: 'linkedin', label: 'LinkedIn' },
-  { value: 'twitter', label: 'Twitter/X' },
-  { value: 'podcast', label: 'Podcast' },
-  { value: 'webinar', label: 'Webinar' },
-];
-
-const LANGUAGE_OPTIONS = [
-  { value: 'all', label: 'All Languages' },
-  { value: 'english', label: 'English' },
-  { value: 'hindi', label: 'Hindi' },
-  { value: 'spanish', label: 'Spanish' },
-  { value: 'french', label: 'French' },
-  { value: 'german', label: 'German' },
-  { value: 'portuguese', label: 'Portuguese' },
-  { value: 'arabic', label: 'Arabic' },
-];
-
-const INPUT_TYPE_OPTIONS = [
-  { value: 'all', label: 'All Input Types' },
-  { value: 'long_video', label: 'Long Video' },
-  { value: 'podcast', label: 'Podcast' },
-  { value: 'webinar', label: 'Webinar' },
-  { value: 'interview', label: 'Interview' },
-  { value: 'live_stream', label: 'Live Stream' },
-];
-
-const OUTPUT_TYPE_OPTIONS = [
-  { value: 'all', label: 'All Output Types' },
-  { value: 'reel', label: 'Reel' },
-  { value: 'short', label: 'YouTube Short' },
-  { value: 'viral_clip', label: 'Viral Clip' },
-  { value: 'chapter', label: 'Chapter' },
-  { value: 'summary', label: 'Summary' },
-  { value: 'transcript', label: 'Transcript' },
-];
-
-const LABEL_MAP: Record<string, Record<string, string>> = {
-  client: Object.fromEntries(CLIENT_OPTIONS.map((o) => [o.value, o.label])),
-  channel: Object.fromEntries(CHANNEL_OPTIONS.map((o) => [o.value, o.label])),
-  language: Object.fromEntries(LANGUAGE_OPTIONS.map((o) => [o.value, o.label])),
-  inputType: Object.fromEntries(INPUT_TYPE_OPTIONS.map((o) => [o.value, o.label])),
-  outputType: Object.fromEntries(OUTPUT_TYPE_OPTIONS.map((o) => [o.value, o.label])),
-};
+const ALL_OPT = { value: 'all', label: 'All' };
 
 interface FilterBarProps {
   className?: string;
@@ -69,6 +15,37 @@ interface FilterBarProps {
 
 export const FilterBar: React.FC<FilterBarProps> = ({ className }) => {
   const { filters, updateFilters, resetFilters, activeFilterCount } = useFilters();
+  const { data: dimensions } = useDimensions();
+
+  const clientOptions = [
+    { value: 'all', label: 'All Clients' },
+    ...(dimensions?.clients ?? []).map((d) => ({ value: d.value, label: d.label })),
+  ];
+  const channelOptions = [
+    { value: 'all', label: 'All Channels' },
+    ...(dimensions?.channels ?? []).map((d) => ({ value: d.value, label: d.label })),
+  ];
+  const languageOptions = [
+    { value: 'all', label: 'All Languages' },
+    ...(dimensions?.languages ?? []).map((d) => ({ value: d.value, label: d.label })),
+  ];
+  const inputTypeOptions = [
+    { value: 'all', label: 'All Input Types' },
+    ...(dimensions?.input_types ?? []).map((d) => ({ value: d.value, label: d.label })),
+  ];
+  const outputTypeOptions = [
+    { value: 'all', label: 'All Output Types' },
+    ...(dimensions?.output_types ?? []).map((d) => ({ value: d.value, label: d.label })),
+  ];
+
+  // Build label maps for display in filter chips
+  const labelMap: Record<string, Record<string, string>> = {
+    client: Object.fromEntries(clientOptions.map((o) => [o.value, o.label])),
+    channel: Object.fromEntries(channelOptions.map((o) => [o.value, o.label])),
+    language: Object.fromEntries(languageOptions.map((o) => [o.value, o.label])),
+    inputType: Object.fromEntries(inputTypeOptions.map((o) => [o.value, o.label])),
+    outputType: Object.fromEntries(outputTypeOptions.map((o) => [o.value, o.label])),
+  };
 
   const chips: { key: keyof typeof filters; label: string }[] = [
     { key: 'client', label: 'Client' },
@@ -98,34 +75,37 @@ export const FilterBar: React.FC<FilterBarProps> = ({ className }) => {
       <FilterDropdown
         label="Client"
         value={filters.client}
-        options={CLIENT_OPTIONS}
+        options={clientOptions}
         onChange={(v) => updateFilters({ client: v })}
-        showSearch={CLIENT_OPTIONS.length > 5}
+        showSearch={clientOptions.length > 5}
       />
       <FilterDropdown
         label="Channel"
         value={filters.channel}
-        options={CHANNEL_OPTIONS}
+        options={channelOptions}
         onChange={(v) => updateFilters({ channel: v })}
+        showSearch={channelOptions.length > 5}
       />
       <FilterDropdown
         label="Language"
         value={filters.language}
-        options={LANGUAGE_OPTIONS}
+        options={languageOptions}
         onChange={(v) => updateFilters({ language: v })}
-        showSearch
+        showSearch={languageOptions.length > 5}
       />
       <FilterDropdown
         label="Input"
         value={filters.inputType}
-        options={INPUT_TYPE_OPTIONS}
+        options={inputTypeOptions}
         onChange={(v) => updateFilters({ inputType: v })}
+        showSearch={inputTypeOptions.length > 5}
       />
       <FilterDropdown
         label="Output"
         value={filters.outputType}
-        options={OUTPUT_TYPE_OPTIONS}
+        options={outputTypeOptions}
         onChange={(v) => updateFilters({ outputType: v })}
+        showSearch={outputTypeOptions.length > 5}
       />
 
       {/* Comparison toggle */}
@@ -134,7 +114,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({ className }) => {
       {/* Active chips */}
       {activeChips.map((chip) => {
         const val = filters[chip.key as keyof typeof filters] as string;
-        const label = LABEL_MAP[chip.key as string]?.[val] ?? val;
+        const label = labelMap[chip.key as string]?.[val] ?? val;
         return (
           <FilterChip
             key={chip.key}
