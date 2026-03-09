@@ -44,7 +44,12 @@ if [ -d "$SHARED_DIR/data" ]; then
 fi
 
 if [ -f "$RELEASE_DIR/alembic.ini" ] && [ -d "$RELEASE_DIR/alembic" ]; then
-  (cd "$RELEASE_DIR" && alembic -c alembic.ini upgrade head)
+  echo "Running database migrations..."
+  if (cd "$RELEASE_DIR" && alembic -c alembic.ini upgrade head); then
+    echo "Migrations applied successfully."
+  else
+    echo "WARNING: Alembic migration failed (DB may be unreachable). Continuing deployment with existing schema."
+  fi
 fi
 
 ln -sfn "$RELEASE_DIR" "$CURRENT_LINK"
