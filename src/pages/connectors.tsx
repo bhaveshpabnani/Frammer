@@ -249,8 +249,6 @@ export default function ConnectorsPage() {
                 <div className="flex items-start justify-between mb-3">
                   <div
                     className="w-10 h-10 rounded-xl flex items-center justify-center text-white"
-                    style={{ backgroundColor: `${conn.color}20`, border: `1px solid ${conn.color}40` }}
-                    // @ts-ignore custom prop
                     style={{ backgroundColor: `${conn.color}25`, border: `1px solid ${conn.color}45` }}
                   >
                     <span style={{ color: conn.color }}>{conn.icon}</span>

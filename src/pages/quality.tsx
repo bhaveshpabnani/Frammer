@@ -22,7 +22,7 @@ import { motion } from 'framer-motion';
 import {
   ShieldCheck, AlertTriangle, AlertCircle, CheckCircle2, ExternalLink, Search,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, downloadCsv } from '@/lib/utils';
 import {
   useQuality, useQualityExtended, useQualityFields, useQualityRules, useQualityIssues,
 } from '@/hooks/useApi';
@@ -151,7 +151,7 @@ const Quality: React.FC = () => {
           title="Data Quality"
           subtitle="Field completeness, rule evaluation (R01–R19), and issue drillthrough"
           badge={{ label: scoreRisk === 'ok' ? 'HEALTHY' : scoreRisk === 'warning' ? 'WARNING' : 'CRITICAL', variant: scoreRisk === 'ok' ? 'green' : 'red' }}
-          onDownload={() => {}}
+          onDownload={() => downloadCsv('frammer-data-quality', (fieldsData ?? []).map(f => ({ field: f.field, table: f.table, null_pct: f.null_pct, unknown_pct: f.unknown_pct, distinct_count: f.distinct_count, status: f.status })))}
         />
 
         {insights.length > 0 && <InsightStrip insights={insights} />}

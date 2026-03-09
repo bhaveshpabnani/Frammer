@@ -7,11 +7,12 @@ import {
   AreaChart, Area, BarChart, Bar, LineChart, Line, Legend,
   ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, Cell,
 } from 'recharts';
-import { Cpu, Clock, TrendingDown, Activity } from 'lucide-react';
+import { Cpu, Clock, TrendingDown, Activity, AlertTriangle, Timer } from 'lucide-react';
 import { monthlyMetrics as mockMonthly, durationBuckets as mockBuckets } from '@/data/mockData';
 import { CHART_COLORS } from '@/types';
+import { downloadCsv } from '@/lib/utils';
 import { CalendarHeatmap } from '@/components/CalendarHeatmap';
-import { useMonthly, useDurationBuckets, useKpis } from '@/hooks/useApi';
+import { useMonthly, useDurationBuckets, useKpis, useLagSlaBreaches, useLagBacklog, useLagAging } from '@/hooks/useApi';
 
 const DarkTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
@@ -35,6 +36,10 @@ const ProcessingInsights: React.FC = () => {
   const { data: liveMonthly  } = useMonthly();
   const { data: liveBuckets  } = useDurationBuckets();
   const { data: kpis         } = useKpis();
+  const { data: slaData      } = useLagSlaBreaches(7);
+  const { data: backlogData  } = useLagBacklog();
+  const { data: agingData    } = useLagAging();
+
   const monthlyData     = liveMonthly   ?? mockMonthly;
   const durationBuckets = liveBuckets   ?? mockBuckets;
 
@@ -72,7 +77,7 @@ const ProcessingInsights: React.FC = () => {
         <PageHeader
           title="Processing Insights"
           subtitle="Understand your AI pipeline — speed, queue, throughput and cost efficiency"
-          onDownload={() => {}}
+          onDownload={() => downloadCsv('frammer-processing-insights', monthlyData.map(m => ({ month: m.month, videos_uploaded: m.videosProcessed, videos_published: m.videosPublished, hours_processed: m.hoursProcessed, avg_duration_min: m.avgDurationMin })))}
         />
 
         {/* KPIs */}
@@ -100,6 +105,38 @@ const ProcessingInsights: React.FC = () => {
             value={longestBucket}
             icon={<TrendingDown size={16} />}
             accentColor="amber"
+          />
+        </div>
+
+        {/* Backlog + SLA KPIs */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <StatsCard
+            title="Backlog (Unfinished)"
+            value={backlogData ? backlogData.total_backlog.toLocaleString() : '—'}
+            unit="processed not published"
+            icon={<AlertTriangle size={16} />}
+            accentColor={backlogData && backlogData.total_backlog > 50 ? 'red' : 'amber'}
+          />
+          <StatsCard
+            title="Backlog Avg Age"
+            value={backlogData ? `${backlogData.avg_days.toFixed(1)} d` : '—'}
+            unit="avg days waiting"
+            icon={<Timer size={16} />}
+            accentColor="amber"
+          />
+          <StatsCard
+            title="SLA Breaches (7 d)"
+            value={slaData ? slaData.overall_breach_count.toLocaleString() : '—'}
+            unit={slaData ? `${slaData.overall_breach_pct.toFixed(1)}% of videos` : ''}
+            icon={<AlertTriangle size={16} />}
+            accentColor={slaData && slaData.overall_breach_pct > 10 ? 'red' : 'green'}
+          />
+          <StatsCard
+            title="Oldest Backlog Item"
+            value={backlogData && backlogData.oldest_days > 0 ? `${backlogData.oldest_days.toFixed(0)} d` : '—'}
+            unit="days since upload"
+            icon={<Clock size={16} />}
+            accentColor={backlogData && backlogData.oldest_days > 14 ? 'red' : 'amber'}
           />
         </div>
 
@@ -198,6 +235,55 @@ const ProcessingInsights: React.FC = () => {
             label="Videos processed"
           />
         </ChartCard>
+
+        {/* Backlog Aging Distribution */}
+        {agingData && agingData.buckets.length > 0 && (
+          <ChartCard
+            title="Backlog Aging Distribution"
+            subtitle="Processed-not-published videos grouped by time since upload"
+            height={220}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={agingData.buckets} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1C1C1C" vertical={false} />
+                <XAxis dataKey="bucket_label" tick={{ fill: '#71717A', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#71717A', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <Tooltip content={<DarkTooltip />} />
+                <Bar dataKey="count" name="Videos in Backlog" radius={[4, 4, 0, 0]} maxBarSize={48}>
+                  {agingData.buckets.map((b, i) => (
+                    <Cell
+                      key={i}
+                      fill={b.min_days >= 14 ? CHART_COLORS.red : b.min_days >= 7 ? CHART_COLORS.amber : CHART_COLORS.blue}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        )}
+
+        {/* SLA Breaches by Channel */}
+        {slaData && slaData.by_channel.length > 0 && (
+          <ChartCard
+            title={`SLA Breaches by Channel (>${slaData.sla_threshold_days} days)`}
+            subtitle={`${slaData.overall_breach_count} total breaches — ${slaData.overall_breach_pct.toFixed(1)}% of all videos`}
+            height={220}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={slaData.by_channel.slice(0, 10)}
+                layout="vertical"
+                margin={{ top: 4, right: 16, left: 0, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#1C1C1C" horizontal={false} />
+                <XAxis type="number" tick={{ fill: '#71717A', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis dataKey="segment" type="category" tick={{ fill: '#A1A1AA', fontSize: 11 }} axisLine={false} tickLine={false} width={90} />
+                <Tooltip content={<DarkTooltip />} />
+                <Bar dataKey="breach_count" name="Breaches" radius={[0, 4, 4, 0]} maxBarSize={18} fill={CHART_COLORS.red} fillOpacity={0.8} />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        )}
       </div>
     </DashboardLayout>
   );

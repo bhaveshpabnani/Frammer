@@ -29,7 +29,7 @@ import {
   ExternalLink, Lock, Users, User, Star, Clock, ShieldCheck,
   BookmarkCheck, AlertCircle,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, downloadCsv } from '@/lib/utils';
 import { useFilters } from '@/contexts/FilterContext';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -350,7 +350,23 @@ const Dashboards: React.FC = () => {
             title="Saved Dashboards"
             subtitle="Official, team, and personal dashboards with filter state persistence and audit trail"
             badge={{ label: 'GOVERNANCE', variant: 'blue' as any }}
-            onDownload={() => {}}
+            onDownload={() => {
+              const src = activeTab === 'official' ? OFFICIAL_DASHBOARDS
+                : activeTab === 'personal' ? personalDashboards
+                : activeTab === 'audit' ? auditLog.map(e => ({ id: e.dashboard_id, name: e.dashboard_name, type: e.action, description: '', data_range: e.data_range, updated_at: e.timestamp, user_id: e.user_id, metric_version: e.metric_version }))
+                : [];
+              downloadCsv(`dashboards-${activeTab}-${new Date().toISOString().slice(0,10)}.csv`,
+                (src as Record<string, unknown>[]).map(d => ({
+                  id: (d as any).id,
+                  name: (d as any).name,
+                  type: (d as any).type,
+                  description: (d as any).description ?? '',
+                  data_range: (d as any).data_range,
+                  updated_at: (d as any).updated_at,
+                  user_id: (d as any).user_id,
+                  metric_version: (d as any).metric_version,
+                })));
+            }}
           />
           <Button
             size="sm"

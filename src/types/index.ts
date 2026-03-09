@@ -35,6 +35,7 @@ export interface ChannelMetrics {
 export interface MonthlyMetrics {
   month: string;   // e.g. "Jan 25"
   videosProcessed: number;
+  videosPublished: number;
   clipsGenerated: number;
   hoursProcessed: number;
   avgDurationMin: number;

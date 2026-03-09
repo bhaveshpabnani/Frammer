@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { DashboardLayout } from '@/components/dashboard-layout';
 import { PageHeader } from '@/components/page-header';
 import { StatsCard } from '@/components/stats-card';
@@ -9,9 +9,12 @@ import {
 } from 'recharts';
 import { outputTypeData as mockOutputTypes } from '@/data/mockData';
 import { CHART_COLORS, OUTPUT_TYPE_LABELS } from '@/types';
+import { downloadCsv } from '@/lib/utils';
 import { Layers, Scissors, TrendingUp } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { useOutputTypes, useMonthly } from '@/hooks/useApi';
+import { useOutputTypes, useMonthly, useMultiDimensional } from '@/hooks/useApi';
+import { useFilters } from '@/contexts/FilterContext';
+import { useNavigate } from 'react-router-dom';
 
 const DarkTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
@@ -32,6 +35,9 @@ const DarkTooltip = ({ active, payload, label }: any) => {
 const OutputTypes: React.FC = () => {
   const { data: liveOutputTypes } = useOutputTypes();
   const { data: liveMonthly } = useMonthly();
+  const { data: outChannelData, isLoading: matrixLoading } = useMultiDimensional('output_type', 'channel', 'uploaded', 8);
+  const { updateFilters } = useFilters();
+  const navigate = useNavigate();
   const outputTypeData = liveOutputTypes ?? mockOutputTypes;
   const total = outputTypeData.reduce((s, d) => s + d.count, 0);
 
@@ -39,6 +45,19 @@ const OutputTypes: React.FC = () => {
     if (!liveOutputTypes) console.warn('[OutputTypes] Output type data unavailable — showing mock fallback');
     if (!liveMonthly)     console.warn('[OutputTypes] Monthly data unavailable — showing mock fallback for trend chart');
   }, [liveOutputTypes, liveMonthly]);
+
+  // Output × channel matrix
+  const outChannelMatrix = useMemo(() => {
+    if (!outChannelData) return { rows: [] as string[], cols: [] as string[], lookup: {} as Record<string, Record<string, number>>, maxVal: 1 };
+    const { cells, dim1_values = [], dim2_values = [] } = outChannelData;
+    const lookup: Record<string, Record<string, number>> = {};
+    for (const c of cells) {
+      if (!lookup[c.dim1]) lookup[c.dim1] = {};
+      lookup[c.dim1][c.dim2] = c.uploaded;
+    }
+    const maxVal = Math.max(...cells.map(c => c.uploaded), 1);
+    return { rows: dim1_values, cols: dim2_values, lookup, maxVal };
+  }, [outChannelData]);
 
   // Derive monthly trend from real data (last 6 months × output-type proportions)
   const recentMonths = (liveMonthly ?? []).slice(-6);
@@ -56,7 +75,7 @@ const OutputTypes: React.FC = () => {
         <PageHeader
           title="Output Type Analytics"
           subtitle="Reels, Shorts, Chapters, Summaries, Viral Clips — deep-dive"
-          onDownload={() => {}}
+          onDownload={() => downloadCsv('frammer-output-types', outputTypeData.map(o => ({ type: o.type, clips: o.count, published: o.published ?? 0, share_pct: (o.count / Math.max(total, 1) * 100).toFixed(1) })))}
         />
 
         {/* Output type cards */}
@@ -74,6 +93,7 @@ const OutputTypes: React.FC = () => {
                 {item.type}
               </p>
               <p className="font-metric text-2xl font-medium text-white">{item.count.toLocaleString()}</p>
+              <p className="text-[10px] text-[#52525B]">clips</p>
               <div className="flex items-center gap-1">
                 <div className="flex-1 h-1 bg-[#1C1C1C] rounded-full overflow-hidden">
                   <div
@@ -127,14 +147,15 @@ const OutputTypes: React.FC = () => {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#1C1C1C]">
-                {['Output Type', 'Count', 'Share', 'MoM Growth'].map(h => (
+                {['Output Type', 'Clips', 'Published', 'Conv. Rate', 'Share'].map(h => (
                   <th key={h} className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-[#52525B]">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {outputTypeData.map((item, i) => (
-                <tr key={i} className="border-b border-[#0F0F0F] hover:bg-white/[0.02]">
+                <tr key={i} className="border-b border-[#0F0F0F] hover:bg-white/[0.04] cursor-pointer"
+                  onClick={() => { updateFilters({ outputType: item.type }); navigate('/videos'); }}>
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full" style={{ background: item.color }} />
@@ -142,6 +163,17 @@ const OutputTypes: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-5 py-3 font-metric text-[#A1A1AA]">{item.count.toLocaleString()}</td>
+                  <td className="px-5 py-3 font-metric text-[#A1A1AA]">{(item.published ?? 0).toLocaleString()}</td>
+                  <td className="px-5 py-3 font-metric">
+                    {item.count > 0 ? (() => {
+                      const rate = ((item.published ?? 0) / item.count * 100);
+                      return (
+                        <span className={rate >= 70 ? 'text-green-400' : rate >= 40 ? 'text-amber-400' : 'text-red-400'}>
+                          {rate.toFixed(1)}%
+                        </span>
+                      );
+                    })() : <span className="text-[#52525B]">—</span>}
+                  </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2">
                       <div className="w-20 h-1.5 bg-[#1C1C1C] rounded-full overflow-hidden">
@@ -150,14 +182,69 @@ const OutputTypes: React.FC = () => {
                       <span className="font-metric text-xs text-[#A1A1AA]">{(item.count / total * 100).toFixed(1)}%</span>
                     </div>
                   </td>
-                  <td className="px-5 py-3">
-                    <span className="badge-green text-xs">+{(8 + i * 1.2).toFixed(1)}%</span>
-                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+
+        {/* Output type × channel matrix */}
+        <ChartCard
+          title="Output Type × Channel Matrix"
+          subtitle="Upload volume per output type (rows) × channel (columns)"
+          height={300}
+          tooltip="Dark cells indicate high production volume for that output type on that channel."
+        >
+          {matrixLoading ? (
+            <div className="flex items-center justify-center h-48 text-[#52525B] text-sm">Loading…</div>
+          ) : outChannelMatrix.rows.length === 0 ? (
+            <div className="flex items-center justify-center h-48 text-[#52525B] text-sm">No data available</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="text-xs w-full">
+                <thead>
+                  <tr>
+                    <th className="text-left py-1.5 pr-3 text-[#52525B] font-medium min-w-[90px]">Output Type</th>
+                    {outChannelMatrix.cols.map((col) => (
+                      <th key={col} className="py-1.5 px-1 text-[#71717A] font-medium text-center max-w-[80px]" title={col}>
+                        {col.length > 10 ? col.slice(0, 10) + '…' : col}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {outChannelMatrix.rows.map((outType) => (
+                    <tr
+                      key={outType}
+                      className="hover:bg-[#0d0d0d] cursor-pointer transition-colors"
+                      onClick={() => { updateFilters({ outputType: outType }); navigate('/videos'); }}
+                    >
+                      <td className="py-1.5 pr-3 text-[#A1A1AA] font-medium">{outType}</td>
+                      {outChannelMatrix.cols.map((col) => {
+                        const val = outChannelMatrix.lookup[outType]?.[col] ?? 0;
+                        const intensity = Math.max(0.05, val / outChannelMatrix.maxVal);
+                        return (
+                          <td key={col} className="py-1 px-1 text-center">
+                            <div
+                              className="rounded text-[10px] font-mono py-0.5 px-1 min-w-[36px] text-center"
+                              style={{
+                                background: `rgba(59, 130, 246, ${intensity.toFixed(2)})`,
+                                color: val > outChannelMatrix.maxVal * 0.5 ? '#fff' : '#71717A',
+                              }}
+                            >
+                              {val > 0 ? val.toLocaleString() : ''}
+                            </div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </ChartCard>
+
       </div>
     </DashboardLayout>
   );
