@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard-layout';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
@@ -78,27 +78,51 @@ const NAV_ITEMS: { key: SettingsTab; label: string; icon: React.ReactNode }[] = 
   { key: 'appearance', label: 'Appearance', icon: <Palette size={14} /> },
 ];
 
+const SETTINGS_KEY = 'frammer_settings';
+
+function loadSettings() {
+  try { return JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? 'null') ?? {}; } catch { return {}; }
+}
+
 export default function SettingsPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<SettingsTab>('workspace');
   const [members, setMembers] = useState<Member[]>(INITIAL_MEMBERS);
   const [apiKeys, setApiKeys] = useState<ApiKey[]>(INITIAL_KEYS);
-  const [workspaceName, setWorkspaceName] = useState('Frammer Workspace');
-  const [timezone, setTimezone] = useState('Asia/Kolkata');
-  const [fiscalMonth, setFiscalMonth] = useState('March');
+
+  const saved = loadSettings();
+  const [workspaceName, setWorkspaceName] = useState<string>(saved.workspaceName ?? 'Frammer Workspace');
+  const [timezone, setTimezone]           = useState<string>(saved.timezone ?? 'Asia/Kolkata');
+  const [fiscalMonth, setFiscalMonth]     = useState<string>(saved.fiscalMonth ?? 'March');
+  const [selectedTheme, setSelectedTheme] = useState<string>(saved.selectedTheme ?? 'Dark (Default)');
+  const [accentColor, setAccentColor]     = useState<string>(saved.accentColor ?? '#E8212B');
 
   const [notifs, setNotifs] = useState({
-    weeklyDigest: true,
-    qualityAlerts: true,
-    processingComplete: false,
-    teamActivity: false,
+    weeklyDigest:        saved.notifs?.weeklyDigest        ?? true,
+    qualityAlerts:       saved.notifs?.qualityAlerts       ?? true,
+    processingComplete:  saved.notifs?.processingComplete  ?? false,
+    teamActivity:        saved.notifs?.teamActivity        ?? false,
   });
 
   const [security, setSecurity] = useState({
-    mfa: true,
-    sessionTimeout: '4h',
-    ssoEnabled: false,
+    mfa:            saved.security?.mfa            ?? true,
+    sessionTimeout: saved.security?.sessionTimeout ?? '4h',
+    ssoEnabled:     saved.security?.ssoEnabled     ?? false,
   });
+
+  // Persist all user preferences to localStorage
+  useEffect(() => {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+      workspaceName, timezone, fiscalMonth, selectedTheme, accentColor, notifs, security,
+    }));
+  }, [workspaceName, timezone, fiscalMonth, selectedTheme, accentColor, notifs, security]);
+
+  // Apply accent color as CSS variable whenever it changes
+  useEffect(() => {
+    const hex = accentColor.replace('#', '');
+    const r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
+    document.documentElement.style.setProperty('--frammer-red', `${r} ${g} ${b}`);
+  }, [accentColor]);
 
   const [inviteEmail, setInviteEmail] = useState('');
 
@@ -338,7 +362,8 @@ export default function SettingsPage() {
                     {['Dark (Default)', 'Dark Dimmed', 'High Contrast'].map((theme) => (
                       <button
                         key={theme}
-                        className={cn('px-3 py-2 rounded-lg border text-xs transition-all', theme === 'Dark (Default)' ? 'border-frammer-red/40 bg-frammer-red/10 text-white' : 'border-[#27272A] text-[#52525B] hover:text-white')}
+                        onClick={() => setSelectedTheme(theme)}
+                        className={cn('px-3 py-2 rounded-lg border text-xs transition-all', theme === selectedTheme ? 'border-frammer-red/40 bg-frammer-red/10 text-white' : 'border-[#27272A] text-[#52525B] hover:text-white')}
                       >
                         {theme}
                       </button>
@@ -351,7 +376,8 @@ export default function SettingsPage() {
                     {['#E8212B', '#3B82F6', '#22C55E', '#F59E0B', '#8B5CF6'].map((color) => (
                       <button
                         key={color}
-                        className={cn('w-7 h-7 rounded-full border-2 transition-transform hover:scale-110', color === '#E8212B' ? 'border-white' : 'border-transparent')}
+                        onClick={() => setAccentColor(color)}
+                        className={cn('w-7 h-7 rounded-full border-2 transition-transform hover:scale-110', color === accentColor ? 'border-white' : 'border-transparent')}
                         style={{ backgroundColor: color }}
                       />
                     ))}

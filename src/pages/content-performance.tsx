@@ -11,9 +11,9 @@ import {
 import { motion } from 'framer-motion';
 import { Layers, FileInput, FileOutput, ArrowRight } from 'lucide-react';
 import { CHART_COLORS } from '@/types';
-import { formatNumber, cn } from '@/lib/utils';
+import { formatNumber, cn, downloadCsv } from '@/lib/utils';
 import {
-  useFunnel, useInputTypes, useOutputTypes, useMultiDimensional, useFilters as _useFilters,
+  useFunnel, useInputTypes, useOutputTypes, useMultiDimensional,
 } from '@/hooks/useApi';
 import { useFilters } from '@/contexts/FilterContext';
 import { FunnelChart } from '@/components/FunnelChart';
@@ -74,8 +74,14 @@ const ContentPerformance: React.FC = () => {
   const published = findStage('published')?.count ?? 0;
 
   // Total input type efficiency
-  const totalInputUploaded = inputTypes?.reduce((s, r) => s + r.count, 0) ?? 0;
-  const totalInputPublished = inputTypes?.reduce((s, r) => s + (r as any).published ?? 0, 0) ?? 0;
+  const totalInputUploaded  = inputTypes?.reduce((s, r) => s + r.count, 0) ?? 0;
+  // Use per-type published sum when available, fall back to funnel published stage
+  const totalInputPublished = (inputTypes?.some(r => (r.published ?? 0) > 0))
+    ? (inputTypes?.reduce((s, r) => s + (r.published ?? 0), 0) ?? published)
+    : published;
+  const inputConvRate = totalInputUploaded > 0
+    ? ((totalInputPublished / totalInputUploaded) * 100).toFixed(1)
+    : null;
 
   // Input type bar data (efficiency = publish rate per type)
   const inputBarData = useMemo(() => {
@@ -83,9 +89,10 @@ const ContentPerformance: React.FC = () => {
     return inputTypes
       .slice(0, 8)
       .map(r => ({
-        type:       r.type,
-        Uploaded:   r.count,
-        Hours:      Math.round(r.hours),
+        type:      r.type,
+        Uploaded:  r.count,
+        Published: r.published ?? 0,
+        Hours:     Math.round(r.hours),
       }));
   }, [inputTypes]);
 
@@ -136,7 +143,7 @@ const ContentPerformance: React.FC = () => {
           title="Content & Funnel"
           subtitle="Upload → Process → Publish pipeline with content type breakdown"
           badge={{ label: 'LIVE', variant: 'red' }}
-          onDownload={() => {}}
+          onDownload={() => downloadCsv('frammer-content-performance', (inputTypes ?? []).map(r => ({ type: r.type, uploaded: r.count, hours: r.hours })))}
         />
 
         <CrossFilterBar />
@@ -175,7 +182,7 @@ const ContentPerformance: React.FC = () => {
             {[
               { title: 'Total Uploaded',  value: formatNumber(uploaded),  icon: <Layers size={15} />,     accentColor: 'red' as const },
               { title: 'Total Processed', value: formatNumber(processed), icon: <FileInput size={15} />,  accentColor: 'blue' as const },
-              { title: 'Total Published', value: formatNumber(published), icon: <FileOutput size={15} />, accentColor: 'green' as const },
+              { title: 'Total Published', value: formatNumber(published), unit: inputConvRate ? `${inputConvRate}% conversion rate` : undefined, icon: <FileOutput size={15} />, accentColor: 'green' as const },
               {
                 title: 'Input Types',
                 value: String(inputTypes?.length ?? '—'),
@@ -260,7 +267,7 @@ const ContentPerformance: React.FC = () => {
         {/* ── Input type funnel bar ─────────────────────────────────────────────── */}
         <ChartCard
           title="Input Type Breakdown"
-          subtitle="Uploaded volume and hours by content input type"
+          subtitle="Uploaded vs published by content input type"
           height={260}
           tooltip="Input types with highest upload volume — click a bar to filter."
         >
@@ -283,7 +290,7 @@ const ContentPerformance: React.FC = () => {
                   dataKey="Uploaded"
                   fill={CHART_COLORS.red}
                   radius={[3, 3, 0, 0]}
-                  maxBarSize={32}
+                  maxBarSize={28}
                   onClick={(d) => updateFilters({ inputType: d.type })}
                   cursor="pointer"
                 >
@@ -291,6 +298,7 @@ const ContentPerformance: React.FC = () => {
                     <Cell key={i} fill={INPUT_COLORS[i % INPUT_COLORS.length]} fillOpacity={0.85} />
                   ))}
                 </Bar>
+                <Bar dataKey="Published" fill={CHART_COLORS.green} radius={[3, 3, 0, 0]} maxBarSize={28} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -356,14 +364,14 @@ const ContentPerformance: React.FC = () => {
         {/* ── Type efficiency table ─────────────────────────────────────────────── */}
         <ChartCard
           title="Input Type Efficiency"
-          subtitle="Upload volume and hours — click to drill to Explorer"
-          height={280}
+          subtitle="Upload, publish, conversion rate and hours by input type — click to drill to Explorer"
+          height={320}
         >
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-[#1C1C1C]">
-                  {['Input Type', 'Uploaded', 'Hours', ''].map((h, i) => (
+                  {['Input Type', 'Uploaded', 'Published', 'Conv. Rate', 'Hours', ''].map((h, i) => (
                     <th key={i} className={cn('py-2 text-[#71717A] font-medium', i === 0 ? 'text-left pr-4' : 'text-right px-2')}>
                       {h}
                     </th>
@@ -371,29 +379,47 @@ const ContentPerformance: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {(inputTypes ?? []).slice(0, 15).map((row, i) => (
-                  <tr key={i} className="border-b border-[#111] hover:bg-[#0d0d0d] transition-colors">
-                    <td className="py-2 pr-4 text-[#E4E4E7]">{row.type}</td>
-                    <td className="py-2 px-2 text-right font-mono text-[#A1A1AA]">{row.count.toLocaleString()}</td>
-                    <td className="py-2 px-2 text-right font-mono text-[#A1A1AA]">{row.hours.toFixed(1)}h</td>
-                    <td className="py-2 pl-2">
-                      <button
-                        onClick={() => navigate(`/videos?inputType=${encodeURIComponent(row.type)}`)}
-                        className="text-[#52525B] hover:text-[#A1A1AA] transition-colors"
-                        title="View in Explorer"
-                      >
-                        <ArrowRight size={12} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {(inputTypes ?? []).slice(0, 15).map((row, i) => {
+                  const pub = row.published ?? 0;
+                  const convRate = row.count > 0 ? ((pub / row.count) * 100).toFixed(1) : '—';
+                  return (
+                    <tr
+                      key={i}
+                      className="border-b border-[#111] hover:bg-[#0d0d0d] transition-colors cursor-pointer"
+                      onClick={() => { updateFilters({ inputType: row.type }); navigate('/videos'); }}
+                    >
+                      <td className="py-2 pr-4 text-[#E4E4E7]">{row.type}</td>
+                      <td className="py-2 px-2 text-right font-mono text-[#A1A1AA]">{row.count.toLocaleString()}</td>
+                      <td className="py-2 px-2 text-right font-mono text-[#A1A1AA]">{pub.toLocaleString()}</td>
+                      <td className="py-2 px-2 text-right font-mono">
+                        <span className={cn(
+                          convRate === '—' ? 'text-[#52525B]' :
+                          parseFloat(convRate) >= 70 ? 'text-green-400' :
+                          parseFloat(convRate) >= 40 ? 'text-amber-400' : 'text-red-400',
+                        )}>
+                          {convRate === '—' ? '—' : `${convRate}%`}
+                        </span>
+                      </td>
+                      <td className="py-2 px-2 text-right font-mono text-[#71717A]">{row.hours.toFixed(1)}h</td>
+                      <td className="py-2 pl-2">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate(`/videos?inputType=${encodeURIComponent(row.type)}`); }}
+                          className="text-[#52525B] hover:text-[#A1A1AA] transition-colors"
+                          title="View in Explorer"
+                        >
+                          <ArrowRight size={12} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
           {inputTypes && (
             <div className="mt-3 flex justify-end">
               <ExportButton
-                data={inputTypes.map(r => ({ input_type: r.type, uploaded: r.count, hours: r.hours }))}
+                data={inputTypes.map(r => ({ input_type: r.type, uploaded: r.count, published: r.published ?? 0, conversion_pct: r.count > 0 ? ((r.published ?? 0) / r.count * 100).toFixed(1) : '0', hours: r.hours }))}
                 filename="input-types"
               />
             </div>

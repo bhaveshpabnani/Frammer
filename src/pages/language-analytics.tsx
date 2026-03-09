@@ -1,17 +1,20 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { DashboardLayout } from '@/components/dashboard-layout';
 import { PageHeader } from '@/components/page-header';
 import { StatsCard } from '@/components/stats-card';
 import { ChartCard } from '@/components/chart-card';
 import {
-  BarChart, Bar, Cell, PieChart, Pie,
+  BarChart, Bar, Cell, PieChart, Pie, LineChart, Line,
   ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from 'recharts';
 import { motion } from 'framer-motion';
 import { Globe2 } from 'lucide-react';
 import { languageData as mockLanguages } from '@/data/mockData';
 import { CHART_COLORS } from '@/types';
-import { useLanguages } from '@/hooks/useApi';
+import { downloadCsv } from '@/lib/utils';
+import { useLanguages, useMonthly, useMultiDimensional } from '@/hooks/useApi';
+import { useFilters } from '@/contexts/FilterContext';
+import { useNavigate } from 'react-router-dom';
 
 const DarkTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
@@ -37,8 +40,42 @@ const LANG_COLORS = [
 
 const LanguageAnalytics: React.FC = () => {
   const { data: liveLanguages } = useLanguages();
+  const { data: monthlyData } = useMonthly();
+  const { data: langChannelData, isLoading: matrixLoading } = useMultiDimensional('language', 'channel', 'uploaded', 8);
+  const { updateFilters } = useFilters();
+  const navigate = useNavigate();
   const languageData = liveLanguages ?? mockLanguages;
   const total = languageData.reduce((s, l) => s + l.count, 0);
+  const totalPublished = languageData.reduce((s, l) => s + (l.published ?? 0), 0);
+  const conversionRate = total > 0 ? ((totalPublished / total) * 100).toFixed(1) : '—';
+
+  // Top languages for trend chart (up to 5 with enough share)
+  const topLangs = languageData.slice(0, 5);
+
+  // Monthly trend: approximate per-language volume using global proportions
+  const languageTrend = useMemo(() => {
+    const months = (monthlyData ?? []).slice(-8);
+    return months.map((m) => {
+      const row: Record<string, string | number> = { month: m.month };
+      topLangs.forEach((l) => {
+        row[l.language] = Math.round(m.videosProcessed * (l.count / Math.max(total, 1)));
+      });
+      return row;
+    });
+  }, [monthlyData, topLangs, total]);
+
+  // Channel × language matrix
+  const matrixData = useMemo(() => {
+    if (!langChannelData) return { rows: [] as string[], cols: [] as string[], lookup: {} as Record<string, Record<string, number>>, maxVal: 1 };
+    const { cells, dim1_values = [], dim2_values = [] } = langChannelData;
+    const lookup: Record<string, Record<string, number>> = {};
+    for (const c of cells) {
+      if (!lookup[c.dim1]) lookup[c.dim1] = {};
+      lookup[c.dim1][c.dim2] = c.uploaded;
+    }
+    const maxVal = Math.max(...cells.map(c => c.uploaded), 1);
+    return { rows: dim1_values, cols: dim2_values, lookup, maxVal };
+  }, [langChannelData]);
 
   useEffect(() => {
     if (!liveLanguages) console.warn('[LanguageAnalytics] Language data unavailable — showing mock fallback');
@@ -48,6 +85,12 @@ const LanguageAnalytics: React.FC = () => {
   const topLang        = languageData[0];
   const multilingualTotal = languageData.slice(1).reduce((s, l) => s + l.count, 0);
 
+  const groupedBarData = languageData.map((l) => ({
+    language: l.language,
+    Uploaded: l.count,
+    Published: l.published ?? 0,
+  }));
+
   return (
     <DashboardLayout title="Language Analytics" subtitle="Content output broken down by language">
       <div className="space-y-6 animate-fade-in">
@@ -55,11 +98,11 @@ const LanguageAnalytics: React.FC = () => {
           title="Language Analytics"
           subtitle="Multi-language content production insights"
           badge={{ label: 'GLOBAL', variant: 'blue' }}
-          onDownload={() => {}}
+          onDownload={() => downloadCsv('frammer-language-analytics', languageData.map(l => ({ language: l.language, clips_uploaded: l.count, clips_published: l.published ?? 0, conversion_pct: l.count > 0 ? ((l.published ?? 0) / l.count * 100).toFixed(1) : 0, share_pct: l.percentage, hours: l.hours ?? '' })))}
         />
 
         {/* KPI strip */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           <StatsCard
             title="Languages Supported"
             value={languageData.length || '—'}
@@ -84,6 +127,12 @@ const LanguageAnalytics: React.FC = () => {
             unit="videos"
             accentColor="green"
           />
+          <StatsCard
+            title="Publish Conversion"
+            value={conversionRate === '—' ? '—' : `${conversionRate}%`}
+            unit={`${totalPublished.toLocaleString()} published`}
+            accentColor="purple"
+          />
         </div>
 
         {/* Language cards */}
@@ -94,8 +143,9 @@ const LanguageAnalytics: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: i * 0.05 }}
-              className="frammer-card p-4 flex flex-col gap-2"
+              className="frammer-card p-4 flex flex-col gap-2 cursor-pointer hover:scale-[1.02] transition-transform"
               style={{ borderColor: `${lang.color}30` }}
+              onClick={() => { updateFilters({ language: lang.language }); navigate('/videos'); }}
             >
               <p className="text-[11px] font-semibold" style={{ color: lang.color }}>{lang.language}</p>
               <p className="font-metric text-xl font-medium text-white">{lang.count.toLocaleString()}</p>
@@ -140,6 +190,22 @@ const LanguageAnalytics: React.FC = () => {
           </ChartCard>
         </div>
 
+        {/* Upload vs Published grouped bar */}
+        <ChartCard title="Uploaded vs Published by Language" subtitle="Conversion funnel per language" height={280}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={groupedBarData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1C1C1C" vertical={false} />
+              <XAxis dataKey="language" tick={{ fill: '#A1A1AA', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: '#71717A', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <Tooltip content={<DarkTooltip />} />
+              <Legend iconSize={8} iconType="circle"
+                formatter={(v) => <span style={{ color: '#A1A1AA', fontSize: 11 }}>{v}</span>} />
+              <Bar dataKey="Uploaded" fill={CHART_COLORS.blue} radius={[4, 4, 0, 0]} maxBarSize={22} />
+              <Bar dataKey="Published" fill={CHART_COLORS.green} radius={[4, 4, 0, 0]} maxBarSize={22} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
         {/* Table */}
         <div className="frammer-card overflow-hidden">
           <div className="px-5 py-4 border-b border-[#1C1C1C]">
@@ -148,39 +214,129 @@ const LanguageAnalytics: React.FC = () => {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#1C1C1C]">
-                {['Language', 'Clips', 'Share', 'YoY Growth'].map(h => (
+                {['Language', 'Uploaded', 'Published', 'Conv. Rate', 'Share'].map(h => (
                   <th key={h} className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-[#52525B]">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {pieData.map((lang, i) => (
-                <tr key={i} className="border-b border-[#0F0F0F] hover:bg-white/[0.02]">
-                  <td className="px-5 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{ background: lang.color }} />
-                      <span className="text-sm font-medium text-white">{lang.language}</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3 font-metric text-[#A1A1AA]">{lang.count.toLocaleString()}</td>
-                  <td className="px-5 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-20 h-1.5 bg-[#1C1C1C] rounded-full overflow-hidden">
-                        <div className="h-full rounded-full" style={{ width: `${lang.percentage}%`, background: lang.color }} />
+              {pieData.map((lang, i) => {
+                const conv = lang.count > 0 ? ((lang.published ?? 0) / lang.count * 100).toFixed(1) : '—';
+                return (
+                  <tr key={i} className="border-b border-[#0F0F0F] hover:bg-white/[0.04] cursor-pointer"
+                    onClick={() => { updateFilters({ language: lang.language }); navigate('/videos'); }}>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full" style={{ background: lang.color }} />
+                        <span className="text-sm font-medium text-white">{lang.language}</span>
                       </div>
-                      <span className="font-metric text-xs text-[#A1A1AA]">{lang.percentage}%</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3">
-                    <span className={i < 3 ? 'badge-green text-xs' : 'badge-blue text-xs'}>
-                      +{(15 + i * 3.5).toFixed(1)}%
-                    </span>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-5 py-3 font-metric text-[#A1A1AA]">{lang.count.toLocaleString()}</td>
+                    <td className="px-5 py-3 font-metric text-[#A1A1AA]">{(lang.published ?? 0).toLocaleString()}</td>
+                    <td className="px-5 py-3 font-metric text-[#A1A1AA]">{conv === '—' ? '—' : `${conv}%`}</td>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-20 h-1.5 bg-[#1C1C1C] rounded-full overflow-hidden">
+                          <div className="h-full rounded-full" style={{ width: `${lang.percentage}%`, background: lang.color }} />
+                        </div>
+                        <span className="font-metric text-xs text-[#A1A1AA]">{lang.percentage}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
+
+        {/* Language volume trend over time */}
+        {languageTrend.length > 0 && (
+          <ChartCard
+            title="Language Volume Trend"
+            subtitle="Monthly production volume by language (proportional estimate — last 8 months)"
+            height={280}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={languageTrend} margin={{ top: 8, right: 16, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1C1C1C" vertical={false} />
+                <XAxis dataKey="month" tick={{ fill: '#71717A', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#71717A', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <Tooltip content={<DarkTooltip />} />
+                <Legend iconSize={8} iconType="circle"
+                  formatter={(v) => <span style={{ color: '#A1A1AA', fontSize: 11 }}>{v}</span>} />
+                {topLangs.map((l) => (
+                  <Line
+                    key={l.language}
+                    type="monotone"
+                    dataKey={l.language}
+                    stroke={l.color}
+                    strokeWidth={2}
+                    dot={{ fill: l.color, r: 2 }}
+                    activeDot={{ r: 4 }}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        )}
+
+        {/* Channel × Language matrix */}
+        <ChartCard
+          title="Channel × Language Matrix"
+          subtitle="Upload volume per language (rows) × channel (columns)"
+          height={300}
+          tooltip="Dark cells indicate high volume. Use this to see which channels drive production in each language."
+        >
+          {matrixLoading ? (
+            <div className="flex items-center justify-center h-48 text-[#52525B] text-sm">Loading…</div>
+          ) : matrixData.rows.length === 0 ? (
+            <div className="flex items-center justify-center h-48 text-[#52525B] text-sm">No data available</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="text-xs w-full">
+                <thead>
+                  <tr>
+                    <th className="text-left py-1.5 pr-3 text-[#52525B] font-medium min-w-[80px]">Language</th>
+                    {matrixData.cols.map((col) => (
+                      <th key={col} className="py-1.5 px-1 text-[#71717A] font-medium text-center max-w-[80px]" title={col}>
+                        {col.length > 10 ? col.slice(0, 10) + '…' : col}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {matrixData.rows.map((lang) => (
+                    <tr
+                      key={lang}
+                      className="hover:bg-[#0d0d0d] cursor-pointer transition-colors"
+                      onClick={() => { updateFilters({ language: lang }); navigate('/videos'); }}
+                    >
+                      <td className="py-1.5 pr-3 text-[#A1A1AA] font-medium">{lang}</td>
+                      {matrixData.cols.map((col) => {
+                        const val = matrixData.lookup[lang]?.[col] ?? 0;
+                        const intensity = Math.max(0.05, val / matrixData.maxVal);
+                        return (
+                          <td key={col} className="py-1 px-1 text-center">
+                            <div
+                              className="rounded text-[10px] font-mono py-0.5 px-1 min-w-[36px] text-center"
+                              style={{
+                                background: `rgba(239, 68, 68, ${intensity.toFixed(2)})`,
+                                color: val > matrixData.maxVal * 0.5 ? '#fff' : '#71717A',
+                              }}
+                            >
+                              {val > 0 ? val.toLocaleString() : ''}
+                            </div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </ChartCard>
+
       </div>
     </DashboardLayout>
   );

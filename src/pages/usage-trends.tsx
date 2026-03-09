@@ -36,7 +36,7 @@ import {
   Percent,
 } from 'lucide-react';
 import { CHART_COLORS } from '@/types';
-import { useMonthly, useGrowth, useLag, useKpis } from '@/hooks/useApi';
+import { useMonthly, useGrowth, useLag, useKpis, useChannels } from '@/hooks/useApi';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -197,6 +197,7 @@ const UsageTrends: React.FC = () => {
   const { data: growth } = useGrowth();
   const { data: lag } = useLag();
   const { data: kpis } = useKpis();
+  const { data: channels } = useChannels();
 
   // ── Core trend data ────────────────────────────────────────────────────────
   const rawTrend = useMemo(() => {
@@ -242,7 +243,6 @@ const UsageTrends: React.FC = () => {
   const momPct = growth?.mom_growth_pct ?? null;
   const rolling30Pct = growth?.rolling_30d_growth_pct ?? null;
   const avgProcessingHrs = lag?.overall?.avg_processing_lag_hrs ?? null;
-  const p90ProcessingHrs = lag?.overall?.p90_processing_lag_hrs ?? null;
 
   // Publish rate derived from latest month
   const latestMonth = rawTrend[rawTrend.length - 1];
@@ -288,19 +288,19 @@ const UsageTrends: React.FC = () => {
     ];
   }, [growth]);
 
-  // ── Lag by channel ─────────────────────────────────────────────────────────
-  const lagByChannel = useMemo(() => {
-    if (!lag?.by_channel?.length) return [];
-    return lag.by_channel
-      .filter((r) => r.avg_processing_lag_hrs != null)
+  // ── Duration by channel (replaces lag chart since processed_at is unavailable) ──
+  const channelDurationData = useMemo(() => {
+    if (!channels?.length) return [];
+    return channels
+      .filter((c) => c.totalDurationHours > 0)
+      .sort((a, b) => b.totalDurationHours - a.totalDurationHours)
       .slice(0, 12)
-      .map((r) => ({
-        channel: r.group_value ?? 'Unknown',
-        avg: Math.round((r.avg_processing_lag_hrs ?? 0) * 10) / 10,
-        p90: Math.round((r.p90_processing_lag_hrs ?? 0) * 10) / 10,
-        publishLag: Math.round((r.avg_publishing_lag_hrs ?? 0) * 10) / 10,
+      .map((c) => ({
+        channel: c.obfuscatedCode,
+        uploadedHrs: Math.round(c.totalDurationHours * 10) / 10,
+        avgMin: Math.round((c.avgProcessingTimeMin ?? 0) * 10) / 10,
       }));
-  }, [lag]);
+  }, [channels]);
 
   // ── Auto-generated insight cards ───────────────────────────────────────────
   const insightCards = useMemo((): InsightCard[] => {
@@ -455,14 +455,20 @@ const UsageTrends: React.FC = () => {
           icon={<TrendingUp size={16} />}
         />
         <StatsCard
-          title="Avg Processing Lag"
-          value={avgProcessingHrs != null ? `${avgProcessingHrs.toFixed(1)} hrs` : '—'}
-          icon={<Clock size={16} />}
+          title="Avg Duration / Video"
+          value={kpis?.avgProcessingTimeMin != null ? `${kpis.avgProcessingTimeMin.toFixed(1)} min` : '—'}
+          icon={<Timer size={16} />}
+          accentColor="blue"
         />
         <StatsCard
-          title="P90 Processing Lag"
-          value={p90ProcessingHrs != null ? `${p90ProcessingHrs.toFixed(1)} hrs` : '—'}
+          title="Avg Duration (Latest)"
+          value={
+            monthly?.[monthly.length - 1]?.avgDurationMin != null
+              ? `${(monthly[monthly.length - 1].avgDurationMin as number).toFixed(1)} min`
+              : '—'
+          }
           icon={<Clock size={16} />}
+          accentColor="amber"
         />
         <StatsCard
           title="Active Channels"
@@ -757,12 +763,12 @@ const UsageTrends: React.FC = () => {
         </ChartCard>
 
         <ChartCard
-          title="Processing & Publish Lag by Channel"
-          subtitle="Avg hrs — upload-to-processed and process-to-published"
+          title="Upload Duration by Channel"
+          subtitle="Total uploaded hours and avg video duration per channel"
         >
-          {lagByChannel.length > 0 ? (
+          {channelDurationData.length > 0 ? (
             <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={lagByChannel} layout="vertical">
+              <BarChart data={channelDurationData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="#27272A" horizontal={false} />
                 <XAxis type="number" tick={{ fontSize: 11, fill: '#71717A' }} unit=" h" />
                 <YAxis
@@ -773,17 +779,13 @@ const UsageTrends: React.FC = () => {
                 />
                 <Tooltip content={<DarkTooltip unit=" hrs" />} />
                 <Legend wrapperStyle={{ fontSize: 11, color: '#A1A1AA' }} />
-                <Bar dataKey="avg" name="Avg Lag (hrs)" fill={CHART_COLORS.blue} radius={[0, 3, 3, 0]} />
-                <Bar dataKey="p90" name="P90 Lag (hrs)" fill={CHART_COLORS.amber} radius={[0, 3, 3, 0]} />
-                {lagByChannel.some((r) => r.publishLag > 0) && (
-                  <Bar dataKey="publishLag" name="Publish Lag (hrs)" fill={CHART_COLORS.purple} radius={[0, 3, 3, 0]} />
-                )}
+                <Bar dataKey="uploadedHrs" name="Uploaded (hrs)" fill={CHART_COLORS.blue} radius={[0, 3, 3, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
             <div className="h-[260px] flex flex-col items-center justify-center gap-2 text-[#52525B] text-sm">
-              <Clock size={20} className="opacity-30" />
-              <span>Lag data unavailable — requires processed_at timestamps in the dataset.</span>
+              <Timer size={20} className="opacity-30" />
+              <span>No duration data available for the selected filters.</span>
             </div>
           )}
         </ChartCard>

@@ -42,6 +42,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { useRegistryMetrics } from '@/hooks/useApi';
 
 interface Metric {
   id: string;
@@ -154,6 +155,7 @@ export default function MetricsPage() {
   const [form, setForm] = useState<typeof EMPTY_METRIC>(EMPTY_METRIC);
   const [filterCategory, setFilterCategory] = useState('all');
   const { toast } = useToast();
+  const { data: registryMetrics } = useRegistryMetrics();
 
   const displayed = filterCategory === 'all' ? metrics : metrics.filter((m) => m.category === filterCategory);
 
@@ -313,6 +315,57 @@ export default function MetricsPage() {
             </TableBody>
           </Table>
         </div>
+
+        {/* Registry Metrics — live from backend */}
+        {registryMetrics && registryMetrics.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <BookOpen size={14} className="text-[#52525B]" />
+              <h3 className="text-sm font-semibold text-white">System Registry Metrics</h3>
+              <span className="text-[10px] px-1.5 py-0.5 rounded border border-blue-500/30 text-blue-400 bg-blue-500/10">
+                {registryMetrics.length} metrics from backend registry
+              </span>
+            </div>
+            <div className="rounded-xl border border-[#1C1C1C] overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[#1C1C1C] bg-[#111111]">
+                    {['Metric', 'Formula / SQL', 'Dimensions', 'Proxy'].map(h => (
+                      <th key={h} className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-[#52525B]">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {registryMetrics.map((m) => (
+                    <tr key={m.name} className="border-b border-[#0F0F0F] hover:bg-white/[0.02]">
+                      <td className="px-4 py-3">
+                        <p className="text-sm text-white font-medium">{m.label}</p>
+                        <p className="text-[10px] text-[#52525B] font-mono">{m.name}</p>
+                      </td>
+                      <td className="px-4 py-3 max-w-xs">
+                        <code className="text-[11px] text-[#A1A1AA] font-mono bg-[#161616] px-2 py-1 rounded border border-[#27272A] block truncate">
+                          {m.formula_sql ?? `${m.numerator ?? '—'} / ${m.denominator ?? '—'}`}
+                        </code>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="text-[11px] text-[#71717A]">
+                          {m.valid_dimensions === 'all' ? 'All dimensions' : (m.valid_dimensions as string[]).join(', ')}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3">
+                        {m.is_proxy ? (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded border border-amber-500/30 text-amber-400 bg-amber-500/10">proxy</span>
+                        ) : (
+                          <span className="text-[10px] text-[#52525B]">direct</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Edit / New modal */}

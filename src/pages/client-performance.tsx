@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/dashboard-layout';
 import { PageHeader } from '@/components/page-header';
 import { StatsCard } from '@/components/stats-card';
@@ -23,8 +24,13 @@ import {
 import { motion } from 'framer-motion';
 import { Zap, Users, TrendingUp, BarChart3 } from 'lucide-react';
 import { CHART_COLORS } from '@/types';
-import { formatNumber } from '@/lib/utils';
+import { formatNumber, downloadCsv } from '@/lib/utils';
 import { useClientsSummary, useFunnel, useConcentration, useChannelHealth } from '@/hooks/useApi';
+import { useFilters } from '@/contexts/FilterContext';
+import { CrossFilterBar } from '@/components/CrossFilterChip';
+import { ExportButton } from '@/components/ExportButton';
+import { EmptyState } from '@/components/EmptyState';
+import { SkeletonPage } from '@/components/SkeletonPage';
 
 const DarkTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
@@ -56,10 +62,14 @@ const QUADRANT_COLORS: Record<string, string> = {
 };
 
 const ClientPerformance: React.FC = () => {
-  const { data: clients } = useClientsSummary();
+  const navigate = useNavigate();
+  const { updateFilters } = useFilters();
+  const { data: clients, isLoading: clientsLoading } = useClientsSummary();
   const { data: funnel } = useFunnel();
   const { data: concentration } = useConcentration();
   const { data: channelHealth } = useChannelHealth();
+
+  const isLoading = clientsLoading && !clients;
 
   // KPI figures
   const totalClients = clients?.length ?? 0;
@@ -95,14 +105,14 @@ const ClientPerformance: React.FC = () => {
     [clients],
   );
 
-  // Channel health scatter
+  // Channel health scatter — use correct field names from ChannelHealthRow
   const scatterData = useMemo(
     () =>
       (channelHealth ?? []).map((r) => ({
         channel: r.channel,
         volume: r.total_uploaded,
-        publishRate: Math.round(r.publish_rate * 1000) / 10,
-        quadrant: r.quadrant,
+        publishRate: Math.round(r.publish_conversion_pct * 10) / 10,
+        quadrant: r.health_quadrant,
       })),
     [channelHealth],
   );
@@ -110,16 +120,27 @@ const ClientPerformance: React.FC = () => {
   // Pareto chart for concentration
   const channelPareto = concentration?.channel_pareto?.slice(0, 15) ?? [];
 
+  if (isLoading) return (
+    <DashboardLayout title="Client Performance" subtitle="Loading…">
+      <SkeletonPage statsCount={4} chartsCount={2} showTable />
+    </DashboardLayout>
+  );
+
   return (
-    <DashboardLayout>
+    <DashboardLayout title="Client Performance" subtitle="Client health, publish rates, channel quadrants">
+      <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Client Performance"
         subtitle="Client health scores, funnel conversion, channel quadrant analysis, and concentration metrics"
+        badge={{ label: 'LIVE', variant: 'red' }}
+        onDownload={() => downloadCsv('frammer-client-performance', (clients ?? []).map(c => ({ client: c.slug, uploaded: c.total_uploaded, published: c.total_published, publish_rate_pct: (c.publish_rate * 100).toFixed(1), channels: c.active_channels, users: c.active_users })))}
       />
+
+      <CrossFilterBar />
 
       {/* KPI cards */}
       <motion.div
-        className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6"
+        className="grid grid-cols-2 lg:grid-cols-4 gap-4"
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
@@ -197,7 +218,13 @@ const ClientPerformance: React.FC = () => {
                 />
                 <Tooltip content={<DarkTooltip />} />
                 <ReferenceLine x={50} stroke={CHART_COLORS.amber} strokeDasharray="4 3" />
-                <Bar dataKey="publishRate" name="Publish Rate %" radius={[0, 4, 4, 0]}>
+                <Bar
+                  dataKey="publishRate"
+                  name="Publish Rate %"
+                  radius={[0, 4, 4, 0]}
+                  onClick={(d) => { updateFilters({ client: d.name }); navigate('/videos'); }}
+                  cursor="pointer"
+                >
                   {clientChartData.map((d) => (
                     <Cell
                       key={d.name}
@@ -273,6 +300,8 @@ const ClientPerformance: React.FC = () => {
                   <Scatter
                     data={scatterData}
                     fill={CHART_COLORS.blue}
+                    onClick={(d: any) => { updateFilters({ channel: d.channel }); navigate('/videos'); }}
+                    cursor="pointer"
                     shape={(props: any) => {
                       const { cx, cy, payload } = props;
                       return (
@@ -348,6 +377,56 @@ const ClientPerformance: React.FC = () => {
           )}
         </ChartCard>
       </motion.div>
+
+      {/* Client detail table */}
+      {clients && clients.length > 0 && (
+        <ChartCard title="Client Detail" subtitle="All clients with volume and publish metrics" height={280}>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-[#1C1C1C]">
+                  {['Client', 'Uploaded', 'Published', 'Pub. Rate', 'Channels', 'Users', ''].map((h, i) => (
+                    <th key={i} className={`py-2 text-[#71717A] font-medium ${i === 0 ? 'text-left pr-4' : 'text-right px-2'}`}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {clientChartData.map((row, i) => (
+                  <tr
+                    key={i}
+                    className="border-b border-[#111] hover:bg-[#0d0d0d] transition-colors cursor-pointer"
+                    onClick={() => { updateFilters({ client: row.name }); navigate('/videos'); }}
+                  >
+                    <td className="py-2 pr-4 text-[#E4E4E7] font-medium">{row.name}</td>
+                    <td className="py-2 px-2 text-right font-mono text-[#A1A1AA]">{row.uploaded.toLocaleString()}</td>
+                    <td className="py-2 px-2 text-right font-mono text-[#A1A1AA]">{row.published.toLocaleString()}</td>
+                    <td className="py-2 px-2 text-right font-mono">
+                      <span className={row.publishRate >= 50 ? 'text-green-400' : row.publishRate >= 25 ? 'text-amber-400' : 'text-red-400'}>
+                        {row.publishRate.toFixed(1)}%
+                      </span>
+                    </td>
+                    <td className="py-2 px-2 text-right text-[#71717A]">{row.channels}</td>
+                    <td className="py-2 px-2 text-right text-[#71717A]">{row.users}</td>
+                    <td className="py-2 pl-2">
+                      <button className="text-[#52525B] hover:text-[#A1A1AA]" title="View in Explorer">
+                        ↗
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-3 flex justify-end">
+            <ExportButton
+              data={clientChartData as unknown as Record<string, unknown>[]}
+              filename="client-performance"
+            />
+          </div>
+        </ChartCard>
+      )}
+
+      </div>
     </DashboardLayout>
   );
 };

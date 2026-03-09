@@ -1,5 +1,5 @@
 /** Typed API endpoint functions. */
-import { apiFetch, apiPost } from './client';
+import { apiFetch, apiPost, apiPostWithMeta } from './client';
 import type {
   KPIResponse,
   MonthlyRow,
@@ -38,6 +38,9 @@ import type {
   GrowthDriversResponse,
   PublishingPlatformCount,
   RegistryMetric,
+  AgentQueryRequest,
+  AgentPlanResponse,
+  AgentQueryResponse,
 } from './types';
 
 // Domain-prefixed canonical paths (Phase 4)
@@ -48,6 +51,7 @@ const FUNNEL  = '/api/v1/funnel-efficiency';
 const CONTENT = '/api/v1/content';
 const DIAG    = '/api/v1/diagnostics';
 const DETAIL  = '/api/v1/detail';
+const AGENT   = '/api/v1/agent';
 
 // ── Core ───────────────────────────────────────────────────────────────────────
 export const fetchKpis = (qs: string) =>
@@ -66,8 +70,8 @@ export const fetchMonthly = (qs: string) =>
 export const fetchGrowth = (qs: string) =>
   apiFetch<GrowthResponseRaw>(`${TRENDS}/growth${qs ? '?' + qs : ''}`);
 
-export const fetchForecast = (metric: string, horizon = 6) =>
-  apiFetch<ForecastResponse>(`${TRENDS}/forecast/${metric}?horizon=${horizon}`);
+export const fetchForecast = (metric: string, horizon = 6, qs = '') =>
+  apiFetch<ForecastResponse>(`${TRENDS}/forecast/${metric}?horizon=${horizon}${qs ? '&' + qs : ''}`);
 
 export const fetchGrowthDrivers = (dimension: string, qs: string) =>
   apiFetch<GrowthDriversResponse>(
@@ -89,8 +93,8 @@ export const fetchUsers = (qs: string) =>
 export const fetchTeams = (qs: string) =>
   apiFetch<TeamRow[]>(`${PERF}/teams${qs ? '?' + qs : ''}`);
 
-export const fetchClientsSummary = () =>
-  apiFetch<ClientSummaryRow[]>(`${PERF}/clients/summary`);
+export const fetchClientsSummary = (qs: string) =>
+  apiFetch<ClientSummaryRow[]>(`${PERF}/clients/summary${qs ? '?' + qs : ''}`);
 
 export const fetchChannelHealth = (qs: string) =>
   apiFetch<ChannelHealthRow[]>(`${PERF}/analytics/channel-health${qs ? '?' + qs : ''}`);
@@ -214,3 +218,9 @@ export const fetchVideoExplorer = (
 
 export const runQuery = (req: QueryRequest) =>
   apiPost<QueryResponse>(`${DETAIL}/query`, req);
+
+export const planAgentQuery = (req: AgentQueryRequest, qs = '') =>
+  apiPostWithMeta<AgentPlanResponse>(`${AGENT}/plan${qs ? '?' + qs : ''}`, req);
+
+export const runAgentQuery = (req: AgentQueryRequest, qs = '') =>
+  apiPostWithMeta<AgentQueryResponse>(`${AGENT}/query${qs ? '?' + qs : ''}`, req);

@@ -16,7 +16,6 @@ import {
   Video,
   Database,
   GitBranch,
-  Zap,
   BarChart3,
   Bot,
   FileText,
@@ -141,7 +140,6 @@ const navGroups = [
     items: [
       { href: '/team-productivity', icon: <Users size={18} />, label: 'Team Productivity' },
       { href: '/client-portal', icon: <BookOpen size={18} />, label: 'Client Portal' },
-      { href: '/client-performance', icon: <Zap size={18} />, label: 'Client Performance' },
       { href: '/processing-insights', icon: <Cpu size={18} />, label: 'Processing Insights' },
     ],
   },

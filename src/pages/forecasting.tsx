@@ -48,6 +48,15 @@ export default function ForecastingPage() {
     isForecast: p.is_forecast,
   }));
 
+  // Bridge: copy last actual value into the first forecast point so lines connect visually
+  const transitionIdx = chartData.findIndex((p) => p.isForecast);
+  if (transitionIdx > 0 && chartData[transitionIdx - 1]?.actual !== undefined) {
+    chartData[transitionIdx] = {
+      ...chartData[transitionIdx],
+      actual: chartData[transitionIdx - 1].actual,
+    };
+  }
+
   const growthRate  = forecastData?.monthly_growth_rate ?? 0;
   const confidence  = forecastData?.model_confidence    ?? 0;
   const isPositive  = !metricInfo.lowerIsBetter ? growthRate > 0 : growthRate < 0;

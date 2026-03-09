@@ -199,6 +199,17 @@ export default function DatasetsPage() {
           badge={{ label: `${datasets.length} datasets`, variant: 'blue' }}
         />
 
+        {/* Backend connection notice */}
+        <div className="flex items-start gap-3 rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-3">
+          <Database size={15} className="text-blue-400 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-xs font-medium text-blue-300">Data warehouse managed by your administrator</p>
+            <p className="text-[11px] text-[#52525B] mt-0.5">
+              Current datasets reflect the production PostgreSQL warehouse. File uploads shown here are previewed locally — contact your admin to ingest new source files into the pipeline.
+            </p>
+          </div>
+        </div>
+
         {/* Upload zone */}
         <div
           onDragOver={(e) => { e.preventDefault(); setDragging(true); }}

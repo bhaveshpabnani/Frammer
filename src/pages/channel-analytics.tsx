@@ -14,7 +14,7 @@ import {
   TrendingUp, Layers, Activity, Users, AlertTriangle, ExternalLink,
 } from 'lucide-react';
 import { CHART_COLORS } from '@/types';
-import { formatNumber, cn } from '@/lib/utils';
+import { formatNumber, cn, downloadCsv } from '@/lib/utils';
 import {
   useChannelHealth, useLag, usePublishingByChannel, useConcentration, useChannels,
 } from '@/hooks/useApi';
@@ -135,7 +135,7 @@ const ChannelAnalytics: React.FC = () => {
           title="Channel Analytics"
           subtitle="Health scores, publish conversion, lag diagnostics, and platform matrix"
           badge={{ label: 'LIVE', variant: 'red' }}
-          onDownload={() => {}}
+          onDownload={() => downloadCsv('frammer-channel-analytics', (healthData ?? []).map(h => ({ channel: h.channel, total_uploaded: h.total_uploaded, publish_conversion_pct: h.publish_conversion_pct, health_score: h.health_score, quadrant: h.health_quadrant })))}
         />
 
         <CrossFilterBar />
