@@ -41,6 +41,12 @@ class ResponseMetadata(BaseModel):
     caveats: List[str]
     unit: Optional[str] = None
     currency: Optional[str] = None
+    planner_source: Optional[str] = None
+    planner_model: Optional[str] = None
+    planner_confidence: Optional[float] = None
+    planner_fallback_reason: Optional[str] = None
+    cache_hit: Optional[bool] = None
+    audit_id: Optional[str] = None
 
 
 class ApiResponse(BaseModel, Generic[T]):

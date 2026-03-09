@@ -136,7 +136,11 @@ def _epoch(d, end_of_day: bool = False) -> int:
 # Public builders
 # ---------------------------------------------------------------------------
 
-def build_where_clause(f: "FilterParams") -> tuple[list[str], dict]:
+def build_where_clause(
+    f: "FilterParams",
+    *,
+    date_column: str = "fv.uploaded_at",
+) -> tuple[list[str], dict]:
     """Build a (where_clauses, params) pair from a ``FilterParams`` instance.
 
     Covers all dimension filters **and** the main date range.
@@ -145,11 +149,11 @@ def build_where_clause(f: "FilterParams") -> tuple[list[str], dict]:
 
     if f.date_from:
         params["date_from_epoch"] = _epoch(f.date_from)
-        where.append("fv.uploaded_at >= :date_from_epoch")
+        where.append(f"{date_column} >= :date_from_epoch")
 
     if f.date_to:
         params["date_to_epoch"] = _epoch(f.date_to, end_of_day=True)
-        where.append("fv.uploaded_at <= :date_to_epoch")
+        where.append(f"{date_column} <= :date_to_epoch")
 
     return where, params
 
@@ -163,7 +167,11 @@ def build_dim_only_where_clause(f: "FilterParams") -> tuple[list[str], dict]:
     return _dim_filters(f)
 
 
-def build_compare_where_clause(f: "FilterParams") -> tuple[list[str], dict]:
+def build_compare_where_clause(
+    f: "FilterParams",
+    *,
+    date_column: str = "fv.uploaded_at",
+) -> tuple[list[str], dict]:
     """Build a (where_clauses, params) pair for the **comparison period**.
 
     Identical dimension filters to ``build_where_clause`` but the date bounds
@@ -178,10 +186,10 @@ def build_compare_where_clause(f: "FilterParams") -> tuple[list[str], dict]:
 
     if getattr(f, "compare_date_from", None):
         params["cmp_from_epoch"] = _epoch(f.compare_date_from)
-        where.append("fv.uploaded_at >= :cmp_from_epoch")
+        where.append(f"{date_column} >= :cmp_from_epoch")
 
     if getattr(f, "compare_date_to", None):
         params["cmp_to_epoch"] = _epoch(f.compare_date_to, end_of_day=True)
-        where.append("fv.uploaded_at <= :cmp_to_epoch")
+        where.append(f"{date_column} <= :cmp_to_epoch")
 
     return where, params

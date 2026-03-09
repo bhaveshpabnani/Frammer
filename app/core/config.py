@@ -38,6 +38,17 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "dev-secret-key"
     PROJECT_NAME: str = "Frammer Analytics API"
     API_V1_PREFIX: str = "/api/v1"
+    AGENT_STATEMENT_TIMEOUT_MS: int = 5000
+    AGENT_MAX_ROWS: int = 500
+    AGENT_MAX_LIMIT: int = 100
+    AGENT_MAX_JOINS: int = 4
+    AGENT_MAX_CHART_CATEGORIES: int = 20
+    OPENAI_API_KEY: str = ""
+    OPENAI_BASE_URL: str = "https://api.openai.com/v1"
+    OPENAI_PLANNER_MODEL: str = "gpt-5-mini"
+    OPENAI_TIMEOUT_S: float = 20.0
+    AGENT_CACHE_TTL_S: int = 120
+    AGENT_AUDIT_LOG_PATH: str = "agent_audit.jsonl"
 
     # ── CORS ───────────────────────────────────────────────────────────────────
     CORS_ORIGINS: str = "http://localhost:8080,http://localhost:8081,http://localhost:5173"

@@ -80,6 +80,10 @@ class MetricDef:
         future implementation.
     proxy_note:
         Brief explanation of what the proxy stands in for.
+    display_unit:
+        Rendering hint used by charts and summaries.
+    default_time_column:
+        Preferred fact timestamp column for date filtering and time bucketing.
     """
 
     name: str
@@ -97,6 +101,8 @@ class MetricDef:
     requires_bridge: bool = False
     is_proxy: bool = False
     proxy_note: str = ""
+    display_unit: str = "number"
+    default_time_column: str = "uploaded_at"
 
 
 # ---------------------------------------------------------------------------
@@ -129,6 +135,7 @@ METRIC_REGISTRY: dict[str, MetricDef] = {
         caveats="Counts every job event, including jobs with no output clips.",
         valid_dimensions=_ALL_DIMS,
         null_handling="always 0 or greater",
+        display_unit="count",
     ),
 
     "total_published": MetricDef(
@@ -141,6 +148,8 @@ METRIC_REGISTRY: dict[str, MetricDef] = {
         caveats="",
         valid_dimensions=_ALL_DIMS,
         null_handling="treat as zero",
+        display_unit="count",
+        default_time_column="published_at",
     ),
 
     "total_processed": MetricDef(
@@ -157,6 +166,8 @@ METRIC_REGISTRY: dict[str, MetricDef] = {
         ),
         valid_dimensions=_NON_BRIDGE_DIMS,
         null_handling="treat as zero",
+        display_unit="count",
+        default_time_column="processed_at",
     ),
 
     "total_clips_created": MetricDef(
@@ -201,6 +212,7 @@ METRIC_REGISTRY: dict[str, MetricDef] = {
         caveats="Returns 0.0 when total_uploaded is zero.",
         valid_dimensions=_ALL_DIMS,
         null_handling="treat as 0.0",
+        display_unit="percent",
     ),
 
     "processing_rate": MetricDef(
@@ -216,6 +228,7 @@ METRIC_REGISTRY: dict[str, MetricDef] = {
         caveats="Returns 0.0 when total_uploaded is zero.",
         valid_dimensions=_NON_BRIDGE_DIMS,
         null_handling="treat as 0.0",
+        display_unit="percent",
     ),
 
     "avg_clips_per_video": MetricDef(
@@ -243,6 +256,7 @@ METRIC_REGISTRY: dict[str, MetricDef] = {
         caveats="uploaded_duration_sec may be NULL for legacy rows.",
         valid_dimensions=_ALL_DIMS,
         null_handling="COALESCE to 0",
+        display_unit="hours",
     ),
 
     "created_duration_hrs": MetricDef(
@@ -258,6 +272,8 @@ METRIC_REGISTRY: dict[str, MetricDef] = {
         ),
         valid_dimensions=_ALL_DIMS,
         null_handling="COALESCE to 0",
+        display_unit="hours",
+        default_time_column="processed_at",
     ),
 
     "published_duration_hrs": MetricDef(
@@ -270,6 +286,8 @@ METRIC_REGISTRY: dict[str, MetricDef] = {
         caveats="published_duration_sec is NULL for unpublished videos.",
         valid_dimensions=_ALL_DIMS,
         null_handling="COALESCE to 0",
+        display_unit="hours",
+        default_time_column="published_at",
     ),
 
     # ── Growth ──────────────────────────────────────────────────────────────
@@ -320,6 +338,7 @@ METRIC_REGISTRY: dict[str, MetricDef] = {
         valid_dimensions=frozenset(),  # global only; not sliceable
         valid_time_grains=frozenset({"all"}),
         null_handling="treat as 0.0",
+        display_unit="percent",
     ),
 
     # ── Composite / analytics ─────────────────────────────────────────────────
@@ -387,6 +406,8 @@ METRIC_REGISTRY: dict[str, MetricDef] = {
             "Infrastructure in place; metric will self-heal when source data improves."
         ),
         null_handling="NULL when both lag fields are absent",
+        display_unit="minutes",
+        default_time_column="processed_at",
     ),
 
     "avg_publishing_lag_min": MetricDef(
@@ -407,5 +428,7 @@ METRIC_REGISTRY: dict[str, MetricDef] = {
         ),
         valid_dimensions=_NON_BRIDGE_DIMS,
         null_handling="NULL when both lag fields are absent",
+        display_unit="minutes",
+        default_time_column="published_at",
     ),
 }

@@ -42,6 +42,7 @@ from app.api.v1 import (
     users,
     videos,
 )
+from app.api.v1.agent import routes as agent
 from app.api.v1.domains import (
     content,
     core,
@@ -71,6 +72,7 @@ api_router.include_router(funnel_efficiency.router, prefix="/funnel-efficiency",
 api_router.include_router(content.router,          prefix="/content",           **_protected)
 api_router.include_router(diagnostics.router,      prefix="/diagnostics",       **_protected)
 api_router.include_router(detail.router,           prefix="/detail",            **_protected)
+api_router.include_router(agent.router,            **_protected)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # DEPRECATED FLAT ROUTES  (old /api/v1/{resource} URLs)
