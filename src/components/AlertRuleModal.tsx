@@ -17,9 +17,9 @@ import type { AlertRuleType, ComparisonOperator, AlertRuleResponse } from '@/api
 
 const RULE_TYPES: { value: AlertRuleType; label: string }[] = [
   { value: 'publish_conversion_drop', label: 'Publish Conversion Drop' },
-  { value: 'processed_published_gap', label: 'Processed → Published Gap' },
+  { value: 'gap_too_high', label: 'Processed → Published Gap' },
   { value: 'backlog_high', label: 'Backlog High' },
-  { value: 'dq_score_low', label: 'DQ Score Low' },
+  { value: 'dq_low', label: 'DQ Score Low' },
   { value: 'missing_metadata_spike', label: 'Missing Metadata Spike' },
 ];
 

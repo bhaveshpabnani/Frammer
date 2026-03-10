@@ -277,5 +277,8 @@ export const deleteAlertRule = (id: string) =>
   apiFetch<void>(`${NOTIF}/alerts/${id}`, { method: 'DELETE' });
 
 // Delivery logs
-export const fetchDeliveryLogs = (page = 1, pageSize = 50) =>
-  apiFetch<DeliveryLogPage>(`${NOTIF}/delivery-logs?page=${page}&page_size=${pageSize}`);
+export const fetchDeliveryLogs = (page = 1, pageSize = 50, subscriptionId?: string) => {
+  const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+  if (subscriptionId) params.set('subscription_id', subscriptionId);
+  return apiFetch<DeliveryLogPage>(`${NOTIF}/delivery-logs?${params}`);
+};

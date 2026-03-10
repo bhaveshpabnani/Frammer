@@ -9,9 +9,9 @@ import { Switch } from '@/components/ui/switch';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Bell, Plus, Trash2, Pencil } from 'lucide-react';
+import { Bell, Plus, Trash2, Pencil, History } from 'lucide-react';
 import {
-  useSubscriptions, useCreateSubscription, useUpdateSubscription, useDeleteSubscription,
+  useSubscriptions, useCreateSubscription, useUpdateSubscription, useDeleteSubscription, useDeliveryLogs,
 } from '@/hooks/useApi';
 import type { DigestType, Frequency, SubscriptionResponse } from '@/api/types';
 
@@ -49,8 +49,9 @@ const emptyForm: FormState = {
 };
 
 export const SubscriptionModal: React.FC<Props> = ({ open, onOpenChange }) => {
-  const [view, setView] = useState<'list' | 'form'>('list');
+  const [view, setView] = useState<'list' | 'form' | 'history'>('list');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [historySubId, setHistorySubId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
 
   const { data: subscriptions = [], isLoading } = useSubscriptions();
@@ -58,8 +59,10 @@ export const SubscriptionModal: React.FC<Props> = ({ open, onOpenChange }) => {
   const updateMut = useUpdateSubscription();
   const deleteMut = useDeleteSubscription();
 
+  const { data: historyData, isLoading: historyLoading } = useDeliveryLogs(1, 10, historySubId ?? undefined);
+
   useEffect(() => {
-    if (open) { setView('list'); setEditingId(null); setForm(emptyForm); }
+    if (open) { setView('list'); setEditingId(null); setHistorySubId(null); setForm(emptyForm); }
   }, [open]);
 
   const openCreate = () => {
@@ -135,6 +138,9 @@ export const SubscriptionModal: React.FC<Props> = ({ open, onOpenChange }) => {
                       onCheckedChange={() => handleToggle(sub)}
                       className="data-[state=checked]:bg-[#e8212b]"
                     />
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-[#71717A] hover:text-white" onClick={() => { setHistorySubId(sub.id); setView('history'); }}>
+                      <History className="h-3.5 w-3.5" />
+                    </Button>
                     <Button variant="ghost" size="icon" className="h-7 w-7 text-[#71717A] hover:text-white" onClick={() => openEdit(sub)}>
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
@@ -148,6 +154,32 @@ export const SubscriptionModal: React.FC<Props> = ({ open, onOpenChange }) => {
             <DialogFooter>
               <Button onClick={openCreate} className="bg-[#e8212b] hover:bg-[#c41c25] gap-2">
                 <Plus className="h-4 w-4" /> New Subscription
+              </Button>
+            </DialogFooter>
+          </>
+        ) : view === 'history' ? (
+          <>
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+              {historyLoading && <p className="text-[#71717A] text-sm">Loading…</p>}
+              {!historyLoading && (!historyData?.items.length) && (
+                <p className="text-[#71717A] text-sm text-center py-6">No delivery history yet</p>
+              )}
+              {historyData?.items.map((log) => (
+                <div key={log.id} className="flex items-center justify-between p-3 rounded-lg border border-[#1C1C1C] bg-[#0a0a0a]">
+                  <div className="flex-1 min-w-0 mr-3">
+                    <p className="text-sm font-medium text-white truncate">{log.report_type}</p>
+                    <p className="text-[10px] text-[#71717A]">{new Date(log.created_at * 1000).toLocaleString()}</p>
+                    {log.error_text && <p className="text-[10px] text-red-400 truncate">{log.error_text}</p>}
+                  </div>
+                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                    log.status === 'sent' ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'
+                  }`}>{log.status}</span>
+                </div>
+              ))}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" className="border-[#27272A] text-[#A1A1AA]" onClick={() => setView('list')}>
+                Back
               </Button>
             </DialogFooter>
           </>

@@ -773,9 +773,9 @@ export type DigestType = 'leadership' | 'ops' | 'dq' | 'client_health' | 'manual
 export type Frequency = 'daily' | 'weekly' | 'biweekly' | 'monthly';
 export type AlertRuleType =
   | 'publish_conversion_drop'
-  | 'processed_published_gap'
+  | 'gap_too_high'
   | 'backlog_high'
-  | 'dq_score_low'
+  | 'dq_low'
   | 'missing_metadata_spike';
 export type ComparisonOperator = 'lt' | 'gt' | 'lte' | 'gte';
 

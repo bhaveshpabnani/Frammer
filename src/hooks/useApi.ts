@@ -754,10 +754,10 @@ export function useDeleteAlertRule() {
 }
 
 // ── Delivery Logs ──────────────────────────────────────────────────────────────
-export function useDeliveryLogs(page = 1, pageSize = 50) {
+export function useDeliveryLogs(page = 1, pageSize = 50, subscriptionId?: string) {
   return useQuery({
-    queryKey: ['delivery-logs', page, pageSize],
-    queryFn: () => fetchDeliveryLogs(page, pageSize),
+    queryKey: ['delivery-logs', page, pageSize, subscriptionId],
+    queryFn: () => fetchDeliveryLogs(page, pageSize, subscriptionId),
     staleTime: 15_000,
   });
 }
