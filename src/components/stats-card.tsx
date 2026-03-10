@@ -64,7 +64,7 @@ export const StatsCard: React.FC<StatsCardProps> = ({
 
   if (loading) {
     return (
-      <div className={cn('frammer-card p-5 animate-pulse', className)}>
+      <div className={cn('frammer-card p-5 animate-pulse')}>
         <div className="h-3 w-2/3 bg-[#1C1C1C] rounded mb-3" />
         <div className="h-8 w-1/2 bg-[#1C1C1C] rounded mb-2" />
         <div className="h-3 w-1/3 bg-[#1C1C1C] rounded" />
@@ -99,7 +99,7 @@ export const StatsCard: React.FC<StatsCardProps> = ({
       {trend !== undefined && (
         <div
           className={cn(
-            'mt-2.5 flex items-center gap-1 text-xs font-medium',
+            'mt-0 flex items-center gap-1 text-xs font-medium',
             trendPositive ? colors.trend_pos : colors.trend_neg
           )}
         >

@@ -46,15 +46,15 @@ const DarkTooltip = ({ active, payload, label }: any) => {
   );
 };
 
-const fadeIn  = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } };
+const fadeIn = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } };
 const stagger = { show: { transition: { staggerChildren: 0.06 } } };
 
 // ── Risk badge ──────────────────────────────────────────────────────────────────
 const RiskBadge = ({ level }: { level: 'critical' | 'warning' | 'ok' }) => {
   const map = {
     critical: 'bg-red-500/15 text-red-400 border-red-500/30',
-    warning:  'bg-amber-500/15 text-amber-400 border-amber-500/30',
-    ok:       'bg-green-500/15 text-green-400 border-green-500/30',
+    warning: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+    ok: 'bg-green-500/15 text-green-400 border-green-500/30',
   };
   const labels = { critical: 'Critical', warning: 'Warning', ok: 'Good' };
   return (
@@ -73,19 +73,19 @@ const Overview: React.FC = () => {
   const navigate = useNavigate();
 
   // Data hooks
-  const { data: liveKpis,   isLoading: kpisLoading } = useKpis();
-  const { data: liveMonthly }                         = useMonthly();
-  const { data: liveChannels }                        = useChannels();
-  const { data: liveOutputTypes }                     = useOutputTypes();
-  const { data: liveLanguages }                       = useLanguages();
-  const { data: funnelData }                          = useFunnel();
-  const { data: growthData }                          = useGrowth();
-  const { data: qualityData }                         = useQuality();
-  const { data: concentrationData }                   = useConcentration();
-  const { data: backlogData }                         = useLagBacklog();
-  const { data: growthDrivers }                       = useGrowthDrivers('channel');
-  const { data: qualityRules }                        = useQualityRules();
-  const { data: agingData }                           = useLagAging();
+  const { data: liveKpis, isLoading: kpisLoading } = useKpis();
+  const { data: liveMonthly } = useMonthly();
+  const { data: liveChannels } = useChannels();
+  const { data: liveOutputTypes } = useOutputTypes();
+  const { data: liveLanguages } = useLanguages();
+  const { data: funnelData } = useFunnel();
+  const { data: growthData } = useGrowth();
+  const { data: qualityData } = useQuality();
+  const { data: concentrationData } = useConcentration();
+  const { data: backlogData } = useLagBacklog();
+  const { data: growthDrivers } = useGrowthDrivers('channel');
+  const { data: qualityRules } = useQualityRules();
+  const { data: agingData } = useLagAging();
 
   // Use live data; fall back to mock only when live data has not loaded yet
   const kpis         = liveKpis        ?? mockKpis;
@@ -98,7 +98,7 @@ const Overview: React.FC = () => {
   // Stage names are Title Case from the backend ("Uploaded", "Processed", "Published")
   const findStage = (label: string) =>
     funnelData?.stages?.find(s => s.stage.toLowerCase() === label);
-  const uploaded  = findStage('uploaded')?.count  ?? kpis.totalVideos;
+  const uploaded = findStage('uploaded')?.count ?? kpis.totalVideos;
   const processed = findStage('processed')?.count ?? (kpis as any).totalProcessed ?? uploaded;
   const published = findStage('published')?.count ?? Math.round(uploaded * ((kpis as any).publishRate ?? 0));
   // Prefer dedicated backlog endpoint
@@ -109,24 +109,24 @@ const Overview: React.FC = () => {
     ? Math.ceil((Date.now() - (agingData.oldest_item.uploaded_at ?? Date.now())) / 86_400_000)
     : null;
 
-  const processingRate        = uploaded  > 0 ? (processed / uploaded)  * 100 : 0;
+  const processingRate = uploaded > 0 ? (processed / uploaded) * 100 : 0;
   const publishConversionRate = processed > 0 ? (published / processed) * 100 : 0;
-  const endToEndRate          = uploaded  > 0 ? (published / uploaded)  * 100 : 0;
+  const endToEndRate = uploaded > 0 ? (published / uploaded) * 100 : 0;
 
   // Fall back to kpi-level rates when funnel data not yet loaded
-  const displayProcessingRate = processingRate        > 0 ? processingRate        : ((kpis as any).processingRate ?? 1) * 100;
-  const displayConversionRate = publishConversionRate > 0 ? publishConversionRate : ((kpis as any).publishRate   ?? 0) * 100;
-  const displayE2ERate        = endToEndRate          > 0 ? endToEndRate          : ((kpis as any).publishRate   ?? 0) * 100;
+  const displayProcessingRate = processingRate > 0 ? processingRate : ((kpis as any).processingRate ?? 1) * 100;
+  const displayConversionRate = publishConversionRate > 0 ? publishConversionRate : ((kpis as any).publishRate ?? 0) * 100;
+  const displayE2ERate = endToEndRate > 0 ? endToEndRate : ((kpis as any).publishRate ?? 0) * 100;
 
   // ── Backlog KPI from dedicated endpoint ─────────────────────────────────────
   const backlogAvgDays = backlogData?.avg_days ?? null;
   const criticalRulesCount = qualityRules?.critical_count ?? 0;
 
   // ── Risk signals for the alert strip ────────────────────────────────────────
-  const dqScore  = (kpis as any).dqScore ?? qualityData?.overall_score ?? null;
+  const dqScore = (kpis as any).dqScore ?? qualityData?.overall_score ?? null;
   const dqRisk: 'ok' | 'warning' | 'critical' =
     dqScore == null ? 'warning' : dqScore >= 80 ? 'ok' : dqScore >= 60 ? 'warning' : 'critical';
-  const momGrowth     = growthData?.mom_growth_pct ?? kpis.momGrowth ?? 0;
+  const momGrowth = growthData?.mom_growth_pct ?? kpis.momGrowth ?? 0;
   const top5ChanShare = concentrationData?.top5_channel_share ?? null;
 
   // ── Alert items ─────────────────────────────────────────────────────────────
@@ -136,31 +136,31 @@ const Overview: React.FC = () => {
 
     if (dqScore != null && dqScore < 80) {
       items.push({
-        icon:  <FileWarning size={13} />,
-        text:  `Data quality score ${dqScore.toFixed(0)}/100 — field completeness needs attention`,
+        icon: <FileWarning size={13} />,
+        text: `Data quality score ${dqScore.toFixed(0)}/100 — field completeness needs attention`,
         level: dqScore < 60 ? 'critical' : 'warning',
         action: 'View DQ', route: '/quality',
       });
     }
     if (backlog > 0) {
       items.push({
-        icon:  <AlertTriangle size={13} />,
-        text:  `${backlog.toLocaleString()} videos processed but not yet published`,
+        icon: <AlertTriangle size={13} />,
+        text: `${backlog.toLocaleString()} videos processed but not yet published`,
         level: backlog > 50 ? 'warning' : 'ok',
         action: 'Investigate', route: '/videos',
       });
     }
     if (displayConversionRate > 0 && displayConversionRate < 60) {
       items.push({
-        icon:  <TrendingDown size={13} />,
-        text:  `Publish conversion ${displayConversionRate.toFixed(1)}% is below the 60% benchmark`,
+        icon: <TrendingDown size={13} />,
+        text: `Publish conversion ${displayConversionRate.toFixed(1)}% is below the 60% benchmark`,
         level: displayConversionRate < 40 ? 'critical' : 'warning',
       });
     }
     if (top5ChanShare != null && top5ChanShare > 80) {
       items.push({
-        icon:  <Target size={13} />,
-        text:  `Top 5 channels account for ${top5ChanShare.toFixed(0)}% of volume — concentration risk`,
+        icon: <Target size={13} />,
+        text: `Top 5 channels account for ${top5ChanShare.toFixed(0)}% of volume — concentration risk`,
         level: 'warning',
         action: 'Channels', route: '/channels',
       });
@@ -169,21 +169,21 @@ const Overview: React.FC = () => {
       items.push({ icon: <CheckCircle2 size={13} />, text: 'All key indicators are within healthy range', level: 'ok' });
     }
     return items;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dqScore, backlog, displayConversionRate, top5ChanShare]);
 
   // ── Chart data shapes ────────────────────────────────────────────────────────
   const channelBar = channelData.slice(0, 6).map(c => ({
-    channel:  c.channel,
+    channel: c.channel,
     Uploaded: c.videosProcessed,
-    Clips:    c.clipsGenerated,
+    Clips: c.clipsGenerated,
   }));
 
   const trendData = monthlyData.map(m => ({
-    month:     m.month,
-    Uploaded:  m.videosProcessed,
+    month: m.month,
+    Uploaded: m.videosProcessed,
     Published: (m as any).videosPublished ?? 0,
-    Clips:     m.clipsGenerated,
+    Clips: m.clipsGenerated,
   }));
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -207,8 +207,8 @@ const Overview: React.FC = () => {
               className={cn(
                 'flex items-center gap-3 px-4 py-2.5 rounded-lg border text-xs',
                 alert.level === 'critical' && 'bg-red-500/10 border-red-500/25 text-red-300',
-                alert.level === 'warning'  && 'bg-amber-500/10 border-amber-500/25 text-amber-300',
-                alert.level === 'ok'       && 'bg-green-500/10 border-green-500/25 text-green-300',
+                alert.level === 'warning' && 'bg-amber-500/10 border-amber-500/25 text-amber-300',
+                alert.level === 'ok' && 'bg-green-500/10 border-green-500/25 text-green-300',
               )}
             >
               <span className="flex-shrink-0">{alert.icon}</span>
@@ -236,6 +236,7 @@ const Overview: React.FC = () => {
                 trend: { value: momGrowth, label: 'MoM' },
                 icon: <Video size={15} />,
                 accentColor: 'red' as const,
+                className: '!pb-2',
               },
               {
                 title: 'Videos Processed',
@@ -286,6 +287,7 @@ const Overview: React.FC = () => {
                 trend: { value: kpis.clipsGrowthMom, label: 'MoM' },
                 icon: <Scissors size={15} />,
                 accentColor: 'red' as const,
+                className: '!pb-2',
               },
               {
                 title: 'Hours Processed',
@@ -407,13 +409,13 @@ const Overview: React.FC = () => {
             <ChartCard
               title="Content Funnel"
               subtitle="Upload → Process → Publish"
-              height={220}
+              height="auto"
               tooltip="Stage-by-stage conversion from uploaded videos to published output."
             >
               <FunnelChart
                 stages={[
-                  { label: 'Uploaded',  value: uploaded,  color: CHART_COLORS.red   },
-                  { label: 'Processed', value: processed, color: CHART_COLORS.blue  },
+                  { label: 'Uploaded', value: uploaded, color: CHART_COLORS.red },
+                  { label: 'Processed', value: processed, color: CHART_COLORS.blue },
                   { label: 'Published', value: published, color: CHART_COLORS.green },
                 ]}
                 showConversionRate
@@ -421,7 +423,7 @@ const Overview: React.FC = () => {
             </ChartCard>
 
             {/* Backlog snapshot */}
-            <div className="frammer-card p-4 space-y-3">
+            <div className="frammer-card px-4 pt-4 pb-2 space-y-3">
               <p className="text-[10px] font-bold uppercase tracking-widest text-[#71717A]">Backlog Snapshot</p>
               <div className="grid grid-cols-2 gap-2">
                 {[
@@ -467,29 +469,29 @@ const Overview: React.FC = () => {
                 <AreaChart data={trendData} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="gradRed2" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor={CHART_COLORS.red}   stopOpacity={0.2} />
-                      <stop offset="95%" stopColor={CHART_COLORS.red}   stopOpacity={0}   />
+                      <stop offset="5%" stopColor={CHART_COLORS.red} stopOpacity={0.2} />
+                      <stop offset="95%" stopColor={CHART_COLORS.red} stopOpacity={0} />
                     </linearGradient>
                     <linearGradient id="gradGreen2" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor={CHART_COLORS.green} stopOpacity={0.2} />
-                      <stop offset="95%" stopColor={CHART_COLORS.green} stopOpacity={0}   />
+                      <stop offset="5%" stopColor={CHART_COLORS.green} stopOpacity={0.2} />
+                      <stop offset="95%" stopColor={CHART_COLORS.green} stopOpacity={0} />
                     </linearGradient>
                     <linearGradient id="gradBlue2" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor={CHART_COLORS.blue}  stopOpacity={0.15} />
-                      <stop offset="95%" stopColor={CHART_COLORS.blue}  stopOpacity={0}    />
+                      <stop offset="5%" stopColor={CHART_COLORS.blue} stopOpacity={0.15} />
+                      <stop offset="95%" stopColor={CHART_COLORS.blue} stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1C1C1C" vertical={false} />
                   <XAxis dataKey="month" tick={{ fill: '#71717A', fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis                 tick={{ fill: '#71717A', fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: '#71717A', fontSize: 11 }} axisLine={false} tickLine={false} />
                   <Tooltip content={<DarkTooltip />} />
                   <Legend
                     formatter={v => <span style={{ color: '#A1A1AA', fontSize: 11 }}>{v}</span>}
                     wrapperStyle={{ paddingTop: 8 }}
                   />
-                  <Area type="monotone" dataKey="Uploaded"  stroke={CHART_COLORS.red}   strokeWidth={2}   fill="url(#gradRed2)"    dot={false} />
-                  <Area type="monotone" dataKey="Published" stroke={CHART_COLORS.green} strokeWidth={2}   fill="url(#gradGreen2)"  dot={false} />
-                  <Area type="monotone" dataKey="Clips"     stroke={CHART_COLORS.blue}  strokeWidth={1.5} fill="url(#gradBlue2)"   dot={false} strokeDasharray="4 2" />
+                  <Area type="monotone" dataKey="Uploaded" stroke={CHART_COLORS.red} strokeWidth={2} fill="url(#gradRed2)" dot={false} />
+                  <Area type="monotone" dataKey="Published" stroke={CHART_COLORS.green} strokeWidth={2} fill="url(#gradGreen2)" dot={false} />
+                  <Area type="monotone" dataKey="Clips" stroke={CHART_COLORS.blue} strokeWidth={1.5} fill="url(#gradBlue2)" dot={false} strokeDasharray="4 2" />
                 </AreaChart>
               </ResponsiveContainer>
             </ChartCard>
@@ -509,8 +511,8 @@ const Overview: React.FC = () => {
               </div>
               <p className={cn(
                 'font-metric text-4xl font-semibold mb-1',
-                dqRisk === 'ok'      ? 'text-green-400' :
-                dqRisk === 'warning' ? 'text-amber-400' : 'text-red-400',
+                dqRisk === 'ok' ? 'text-green-400' :
+                  dqRisk === 'warning' ? 'text-amber-400' : 'text-red-400',
               )}>
                 {dqScore != null ? dqScore.toFixed(0) : '—'}
                 <span className="text-base font-normal text-[#52525B]">/100</span>
@@ -531,38 +533,38 @@ const Overview: React.FC = () => {
             </div>
 
             {/* Key movers panel */}
-            <div className="frammer-card p-4">
+            <div className="frammer-card px-4 pt-6 pb-7">
               <p className="text-[10px] font-bold uppercase tracking-widest text-[#71717A] mb-3">Key Movers</p>
               <div className="space-y-0">
                 {[
                   {
                     label: 'MoM Volume Growth',
                     value: `${momGrowth >= 0 ? '+' : ''}${momGrowth.toFixed(1)}%`,
-                    sub:   'Uploaded count vs prior month',
+                    sub: 'Uploaded count vs prior month',
                     positive: momGrowth >= 0,
                   },
                   {
                     label: 'E2E Publish Rate',
                     value: `${displayE2ERate.toFixed(1)}%`,
-                    sub:   'Published out of uploaded total',
+                    sub: 'Published out of uploaded total',
                     positive: displayE2ERate >= 50,
                   },
                   {
                     label: 'Top Channel',
                     value: kpis.topChannel ?? '—',
-                    sub:   `${channelData[0]?.videosProcessed ?? 0} videos`,
+                    sub: `${channelData[0]?.videosProcessed ?? 0} videos`,
                     positive: true,
                   },
                   {
                     label: 'Top Language',
                     value: kpis.topLanguage ?? '—',
-                    sub:   languageData[0] ? `${languageData[0].percentage}% of output` : '',
+                    sub: languageData[0] ? `${languageData[0].percentage}% of output` : '',
                     positive: true,
                   },
                   {
                     label: 'Publish Backlog',
                     value: backlog > 0 ? backlog.toLocaleString() : 'Clear',
-                    sub:   'Processed but not published',
+                    sub: 'Processed but not published',
                     positive: backlog === 0,
                   },
                 ].map((item, i) => (
@@ -603,8 +605,8 @@ const Overview: React.FC = () => {
                 <YAxis tick={{ fill: '#71717A', fontSize: 11 }} axisLine={false} tickLine={false} />
                 <Tooltip content={<DarkTooltip />} />
                 <Legend formatter={v => <span style={{ color: '#A1A1AA', fontSize: 11 }}>{v}</span>} />
-                <Bar dataKey="Uploaded" fill={CHART_COLORS.red}  radius={[3, 3, 0, 0]} maxBarSize={24} />
-                <Bar dataKey="Clips"    fill={CHART_COLORS.blue} radius={[3, 3, 0, 0]} maxBarSize={24} />
+                <Bar dataKey="Uploaded" fill={CHART_COLORS.red} radius={[3, 3, 0, 0]} maxBarSize={24} />
+                <Bar dataKey="Clips" fill={CHART_COLORS.blue} radius={[3, 3, 0, 0]} maxBarSize={24} />
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>
@@ -659,7 +661,7 @@ const Overview: React.FC = () => {
               margin={{ top: 4, right: 16, left: 0, bottom: 0 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#1C1C1C" horizontal={false} />
-              <XAxis type="number"   tick={{ fill: '#71717A', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <XAxis type="number" tick={{ fill: '#71717A', fontSize: 11 }} axisLine={false} tickLine={false} />
               <YAxis
                 dataKey="language"
                 type="category"
