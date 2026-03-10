@@ -44,6 +44,17 @@ import {
   fetchPublishingByChannel,
   fetchQualityExtended,
   fetchRegistryMetrics,
+  sendReport,
+  sendTestEmail,
+  fetchSubscriptions,
+  createSubscription,
+  updateSubscription,
+  deleteSubscription,
+  fetchAlertRules,
+  createAlertRule,
+  updateAlertRule,
+  deleteAlertRule,
+  fetchDeliveryLogs,
 } from '@/api/endpoints';
 import type {
   QueryRequest,
@@ -51,7 +62,14 @@ import type {
   LagResponseRaw,
   LagMetricsRowRaw,
   VideoRowExtended,
+  SendReportRequest,
+  SendTestEmailRequest,
+  SubscriptionCreate,
+  SubscriptionUpdate,
+  AlertRuleCreate,
+  AlertRuleUpdate,
 } from '@/api/types';
+import { useQueryClient } from '@tanstack/react-query';
 import { CHART_COLORS } from '@/types';
 
 // ── KPIs ───────────────────────────────────────────────────────────────────────
@@ -648,6 +666,99 @@ export function useRegistryMetrics() {
           : [],
       })),
     staleTime: 300_000,
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Notifications
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export function useSendReport() {
+  return useMutation({
+    mutationFn: (req: SendReportRequest) => sendReport(req),
+  });
+}
+
+export function useSendTestEmail() {
+  return useMutation({
+    mutationFn: (req: SendTestEmailRequest) => sendTestEmail(req),
+  });
+}
+
+// ── Subscriptions ──────────────────────────────────────────────────────────────
+export function useSubscriptions() {
+  return useQuery({
+    queryKey: ['subscriptions'],
+    queryFn: fetchSubscriptions,
+    staleTime: 30_000,
+  });
+}
+
+export function useCreateSubscription() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: SubscriptionCreate) => createSubscription(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['subscriptions'] }),
+  });
+}
+
+export function useUpdateSubscription() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: SubscriptionUpdate }) =>
+      updateSubscription(id, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['subscriptions'] }),
+  });
+}
+
+export function useDeleteSubscription() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteSubscription(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['subscriptions'] }),
+  });
+}
+
+// ── Alert Rules ────────────────────────────────────────────────────────────────
+export function useAlertRules() {
+  return useQuery({
+    queryKey: ['alert-rules'],
+    queryFn: fetchAlertRules,
+    staleTime: 30_000,
+  });
+}
+
+export function useCreateAlertRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: AlertRuleCreate) => createAlertRule(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['alert-rules'] }),
+  });
+}
+
+export function useUpdateAlertRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: AlertRuleUpdate }) =>
+      updateAlertRule(id, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['alert-rules'] }),
+  });
+}
+
+export function useDeleteAlertRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteAlertRule(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['alert-rules'] }),
+  });
+}
+
+// ── Delivery Logs ──────────────────────────────────────────────────────────────
+export function useDeliveryLogs(page = 1, pageSize = 50, subscriptionId?: string) {
+  return useQuery({
+    queryKey: ['delivery-logs', page, pageSize, subscriptionId],
+    queryFn: () => fetchDeliveryLogs(page, pageSize, subscriptionId),
+    staleTime: 15_000,
   });
 }
 
