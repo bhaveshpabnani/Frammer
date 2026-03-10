@@ -26,6 +26,7 @@ import {
   Calculator,
   Activity,
   Grid3X3,
+  Bell,
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { Badge } from '@/components/ui/badge';
@@ -146,6 +147,7 @@ const navGroups = [
     label: 'Admin',
     items: [
       { href: '/quality', icon: <ShieldCheck size={18} />, label: 'Data Quality' },
+      { href: '/notifications', icon: <Bell size={18} />, label: 'Notifications' },
     ],
   },
 ];
