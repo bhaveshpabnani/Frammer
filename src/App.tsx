@@ -31,6 +31,7 @@ import SettingsPage from '@/pages/settings';
 import NotFound from '@/pages/NotFound';
 import UsageTrends from '@/pages/usage-trends';
 import MultiDimensional from '@/pages/multi-dimensional';
+import NotificationsPage from '@/pages/notifications';
 // client-performance merged into client-portal
 
 const queryClient = new QueryClient();
@@ -70,6 +71,7 @@ const App = () => (
               <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
               <Route path="/usage-trends" element={<ProtectedRoute><UsageTrends /></ProtectedRoute>} />
               <Route path="/multi-dimensional" element={<ProtectedRoute><MultiDimensional /></ProtectedRoute>} />
+              <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
               {/* /client-performance removed — merged into /client-portal */}
               <Route path="*" element={<NotFound />} />
             </Routes>
