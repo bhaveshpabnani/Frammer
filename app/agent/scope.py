@@ -32,6 +32,9 @@ _DATE_RANGE_ALIASES = {
     "last_month": "last_month",
     "ytd": "ytd",
     "year_to_date": "ytd",
+    "all": "all",
+    "all_data": "all",
+    "custom": "custom",
 }
 
 
@@ -119,7 +122,7 @@ def _request_filters(filter_params: FilterParams) -> dict[str, Any]:
         value = getattr(filter_params, key, None)
         if value is not None:
             request_filters[key] = value
-    if filter_params.date_range and filter_params.date_range != "all":
+    if filter_params.date_range and filter_params.date_range not in ("all", "all_data"):
         request_filters["date_range"] = filter_params.date_range
     return request_filters
 

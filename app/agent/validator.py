@@ -10,7 +10,7 @@ from app.registry.metrics import METRIC_REGISTRY, MetricDef
 
 _UNSUPPORTED_METRICS = frozenset({"mom_growth_pct", "health_score", "productivity_index"})
 _MAX_DIMENSIONS = 2
-_VALID_DATE_RANGES = frozenset({"last_7d", "last_30d", "last_90d", "this_month", "last_month", "ytd", "all"})
+_VALID_DATE_RANGES = frozenset({"last_7d", "last_30d", "last_90d", "this_month", "last_month", "ytd", "all", "all_data", "custom"})
 settings = get_settings()
 
 
