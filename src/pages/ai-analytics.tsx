@@ -266,13 +266,46 @@ function AssistantBubble({ msg, onFollowUp }: { msg: AssistantMessage; onFollowU
           )}
         </div>
 
-        {/* Inline chart */}
+        {/* Inline chart (non-table) */}
         {response.chart_spec && rows.length > 0 && response.chart_spec.chart_type !== 'table' && (
           <div className="rounded-2xl border border-white/8 bg-[#0F0F11] p-4">
             {response.chart_spec.title && (
               <p className="mb-3 text-xs font-medium text-[#9A9AA4]">{response.chart_spec.title}</p>
             )}
             <InlineChart response={response} rows={rows} />
+          </div>
+        )}
+
+        {/* Inline table */}
+        {response.chart_spec?.chart_type === 'table' && rows.length > 0 && (
+          <div className="overflow-hidden rounded-2xl border border-white/8 bg-[#0F0F11]">
+            {response.chart_spec.title && (
+              <p className="border-b border-white/6 px-4 py-2 text-xs font-medium text-[#9A9AA4]">
+                {response.chart_spec.title}
+              </p>
+            )}
+            <div className="max-h-64 overflow-x-auto overflow-y-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-white/6">
+                    {response.columns.map((col) => (
+                      <th key={col} className="px-4 py-2 text-left font-medium uppercase tracking-wider text-[#71717A]">{col}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row, i) => (
+                    <tr key={i} className="border-b border-white/[0.04] hover:bg-white/[0.03]">
+                      {response.columns.map((col) => (
+                        <td key={col} className="px-4 py-2 text-[#E4E4E7]">
+                          {fmtValue(row[col], response.chart_spec?.formatters[col])}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
