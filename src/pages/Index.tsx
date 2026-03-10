@@ -1,9 +1,10 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/dashboard-layout';
 import { PageHeader } from '@/components/page-header';
 import { StatsCard } from '@/components/stats-card';
 import { ChartCard } from '@/components/chart-card';
+import { Button } from '@/components/ui/button';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
@@ -12,7 +13,7 @@ import { motion } from 'framer-motion';
 import {
   Video, Scissors, Clock, Users, Play, TrendingUp, ShieldCheck,
   AlertTriangle, CheckCircle2, ArrowRight, TrendingDown, FileWarning,
-  Activity, Target, Zap,
+  Activity, Target, Zap, Mail, Bell, ShieldAlert,
 } from 'lucide-react';
 import {
   kpis as mockKpis, monthlyMetrics as mockMonthly,
@@ -28,6 +29,9 @@ import {
   useLagBacklog, useGrowthDrivers, useQualityRules, useLagAging,
 } from '@/hooks/useApi';
 import { InsightStrip, buildInsights } from '@/components/InsightStrip';
+import { EmailReportModal } from '@/components/EmailReportModal';
+import { SubscriptionModal } from '@/components/SubscriptionModal';
+import { AlertRuleModal } from '@/components/AlertRuleModal';
 
 // Custom tooltip component for charts
 const DarkTooltip = ({ active, payload, label }: any) => {
@@ -71,6 +75,9 @@ const SectionLabel = ({ children }: { children: React.ReactNode }) => (
 
 const Overview: React.FC = () => {
   const navigate = useNavigate();
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [subModalOpen, setSubModalOpen] = useState(false);
+  const [alertModalOpen, setAlertModalOpen] = useState(false);
 
   // Data hooks
   const { data: liveKpis, isLoading: kpisLoading } = useKpis();
@@ -198,6 +205,19 @@ const Overview: React.FC = () => {
           badge={{ label: 'LIVE', variant: 'red' }}
           onDownload={() => downloadCsv('frammer-overview-monthly', monthlyData.map(m => ({ month: m.month, uploaded: m.videosProcessed, published: m.videosPublished, hours_processed: m.hoursProcessed, avg_duration_min: m.avgDurationMin })))}
         />
+
+        {/* Notification actions */}
+        <div className="flex gap-2 -mt-3">
+          <Button variant="outline" size="sm" className="gap-1.5 bg-[#111] border-[#1C1C1C] text-[#A1A1AA] hover:text-white" onClick={() => setEmailModalOpen(true)}>
+            <Mail className="h-3.5 w-3.5" /> Email Report
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1.5 bg-[#111] border-[#1C1C1C] text-[#A1A1AA] hover:text-white" onClick={() => setSubModalOpen(true)}>
+            <Bell className="h-3.5 w-3.5" /> Subscriptions
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1.5 bg-[#111] border-[#1C1C1C] text-[#A1A1AA] hover:text-white" onClick={() => setAlertModalOpen(true)}>
+            <ShieldAlert className="h-3.5 w-3.5" /> Alerts
+          </Button>
+        </div>
 
         {/* ── Alert strip ──────────────────────────────────────────────────────── */}
         <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="space-y-1.5">
@@ -685,6 +705,10 @@ const Overview: React.FC = () => {
         </ChartCard>
 
       </div>
+
+      <EmailReportModal open={emailModalOpen} onOpenChange={setEmailModalOpen} />
+      <SubscriptionModal open={subModalOpen} onOpenChange={setSubModalOpen} />
+      <AlertRuleModal open={alertModalOpen} onOpenChange={setAlertModalOpen} />
     </DashboardLayout>
   );
 };
