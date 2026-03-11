@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { runAgentQuery } from '@/api/endpoints';
 import { toApiParams } from '@/api/client';
-import type { AgentQueryRequest, AgentQueryResponse } from '@/api/types';
+import type { AgentQueryRequest, AgentQueryResponse, ResponseBlock } from '@/api/types';
 import { useFilters } from '@/contexts/FilterContext';
 import type { FilterState } from '@/contexts/FilterContext';
 import { CHART_COLORS } from '@/types';
@@ -17,7 +17,7 @@ import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
-import { Bot, LoaderCircle, Plus, Send, Sparkles } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, Bot, LoaderCircle, Plus, Send, Sparkles } from 'lucide-react';
 
 const mdComponents = {
   h1: ({ children }: React.HTMLAttributes<HTMLHeadingElement>) => <h1 className="text-base font-semibold text-white mb-1">{children}</h1>,
@@ -215,6 +215,104 @@ function InlineChart({ response, rows }: { response: AgentQueryResponse; rows: R
   );
 }
 
+//  Block rendering components 
+
+function StatCard({ stat }: { stat: { label: string; value: number | string; unit?: string | null; delta_pct?: number | null; trend?: string | null } }) {
+  const trendColor = stat.trend === 'up' ? 'text-emerald-400' : stat.trend === 'down' ? 'text-red-400' : 'text-[#71717A]';
+  const TrendIcon = stat.trend === 'up' ? ArrowUpRight : stat.trend === 'down' ? ArrowDownRight : null;
+  return (
+    <div className="rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3">
+      <p className="text-[10px] uppercase tracking-widest text-[#8B8B96]">{stat.label}</p>
+      <p className="mt-1 text-2xl font-semibold text-white">
+        {typeof stat.value === 'number' ? stat.value.toLocaleString(undefined, { maximumFractionDigits: 2 }) : stat.value}
+        {stat.unit && <span className="ml-1 text-xs text-[#71717A]">{stat.unit}</span>}
+      </p>
+      {stat.delta_pct != null && (
+        <div className={cn('mt-1 flex items-center gap-0.5 text-xs', trendColor)}>
+          {TrendIcon && <TrendIcon className="h-3 w-3" />}
+          <span>{stat.delta_pct > 0 ? '+' : ''}{stat.delta_pct.toFixed(1)}%</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BlockRenderer({ block }: { block: ResponseBlock }) {
+  const blockRows = useMemo(
+    () => block.columns && block.rows ? rowsToObjects(block.columns, block.rows) : [],
+    [block.columns, block.rows],
+  );
+
+  if (block.block_type === 'markdown' && block.content) {
+    return (
+      <div className="px-1">
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents as never}>
+          {block.content}
+        </ReactMarkdown>
+      </div>
+    );
+  }
+
+  if ((block.block_type === 'stat' || block.block_type === 'kpi_grid') && block.stats?.length) {
+    return (
+      <div>
+        {block.title && <p className="mb-2 text-xs font-medium text-[#9A9AA4]">{block.title}</p>}
+        <div className={cn('grid gap-2', block.stats.length <= 2 ? 'grid-cols-2' : block.stats.length === 3 ? 'grid-cols-3' : 'grid-cols-2 sm:grid-cols-4')}>
+          {block.stats.map((s, i) => <StatCard key={i} stat={s} />)}
+        </div>
+      </div>
+    );
+  }
+
+  if (block.block_type === 'chart' && block.chart_spec && blockRows.length > 0 && block.chart_spec.chart_type !== 'table') {
+    const fakeResponse = {
+      columns: block.columns ?? [],
+      rows: block.rows ?? [],
+      chart_spec: block.chart_spec,
+    } as AgentQueryResponse;
+    return (
+      <div className="rounded-2xl border border-white/8 bg-[#0F0F11] p-4">
+        {block.title && <p className="mb-3 text-xs font-medium text-[#9A9AA4]">{block.title}</p>}
+        <InlineChart response={fakeResponse} rows={blockRows} />
+      </div>
+    );
+  }
+
+  if ((block.block_type === 'table' || (block.block_type === 'chart' && block.chart_spec?.chart_type === 'table')) && blockRows.length > 0) {
+    const cols = block.columns ?? [];
+    const formatters = block.chart_spec?.formatters ?? {};
+    return (
+      <div className="overflow-hidden rounded-2xl border border-white/8 bg-[#0F0F11]">
+        {block.title && (
+          <p className="border-b border-white/6 px-4 py-2 text-xs font-medium text-[#9A9AA4]">{block.title}</p>
+        )}
+        <div className="max-h-64 overflow-x-auto overflow-y-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-white/6">
+                {cols.map((col) => (
+                  <th key={col} className="px-4 py-2 text-left font-medium uppercase tracking-wider text-[#71717A]">{col}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {blockRows.map((row, i) => (
+                <tr key={i} className="border-b border-white/[0.04] hover:bg-white/[0.03]">
+                  {cols.map((col) => (
+                    <td key={col} className="px-4 py-2 text-[#E4E4E7]">{fmtValue(row[col], formatters[col])}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
 //  Message bubbles 
 
 function UserBubble({ msg }: { msg: UserMessage }) {
@@ -265,6 +363,7 @@ function AssistantBubble({ msg, onFollowUp }: { msg: AssistantMessage; onFollowU
   }
 
   const { response } = msg;
+  const hasBlocks = response.blocks && response.blocks.length > 0;
 
   return (
     <div className="flex gap-3 px-4">
@@ -284,47 +383,58 @@ function AssistantBubble({ msg, onFollowUp }: { msg: AssistantMessage; onFollowU
           )}
         </div>
 
-        {/* Inline chart (non-table) */}
-        {response.chart_spec && rows.length > 0 && response.chart_spec.chart_type !== 'table' && (
-          <div className="rounded-2xl border border-white/8 bg-[#0F0F11] p-4">
-            {response.chart_spec.title && (
-              <p className="mb-3 text-xs font-medium text-[#9A9AA4]">{response.chart_spec.title}</p>
-            )}
-            <InlineChart response={response} rows={rows} />
+        {/* Multi-block rendering */}
+        {hasBlocks ? (
+          <div className="space-y-3">
+            {response.blocks!.map((block, i) => (
+              <BlockRenderer key={i} block={block} />
+            ))}
           </div>
-        )}
+        ) : (
+          <>
+            {/* Inline chart (non-table) — legacy single-block */}
+            {response.chart_spec && rows.length > 0 && response.chart_spec.chart_type !== 'table' && (
+              <div className="rounded-2xl border border-white/8 bg-[#0F0F11] p-4">
+                {response.chart_spec.title && (
+                  <p className="mb-3 text-xs font-medium text-[#9A9AA4]">{response.chart_spec.title}</p>
+                )}
+                <InlineChart response={response} rows={rows} />
+              </div>
+            )}
 
-        {/* Inline table */}
-        {response.chart_spec?.chart_type === 'table' && rows.length > 0 && (
-          <div className="overflow-hidden rounded-2xl border border-white/8 bg-[#0F0F11]">
-            {response.chart_spec.title && (
-              <p className="border-b border-white/6 px-4 py-2 text-xs font-medium text-[#9A9AA4]">
-                {response.chart_spec.title}
-              </p>
-            )}
-            <div className="max-h-64 overflow-x-auto overflow-y-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-white/6">
-                    {response.columns.map((col) => (
-                      <th key={col} className="px-4 py-2 text-left font-medium uppercase tracking-wider text-[#71717A]">{col}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row, i) => (
-                    <tr key={i} className="border-b border-white/[0.04] hover:bg-white/[0.03]">
-                      {response.columns.map((col) => (
-                        <td key={col} className="px-4 py-2 text-[#E4E4E7]">
-                          {fmtValue(row[col], response.chart_spec?.formatters[col])}
-                        </td>
+            {/* Inline table — legacy single-block */}
+            {response.chart_spec?.chart_type === 'table' && rows.length > 0 && (
+              <div className="overflow-hidden rounded-2xl border border-white/8 bg-[#0F0F11]">
+                {response.chart_spec.title && (
+                  <p className="border-b border-white/6 px-4 py-2 text-xs font-medium text-[#9A9AA4]">
+                    {response.chart_spec.title}
+                  </p>
+                )}
+                <div className="max-h-64 overflow-x-auto overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-white/6">
+                        {response.columns.map((col) => (
+                          <th key={col} className="px-4 py-2 text-left font-medium uppercase tracking-wider text-[#71717A]">{col}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((row, i) => (
+                        <tr key={i} className="border-b border-white/[0.04] hover:bg-white/[0.03]">
+                          {response.columns.map((col) => (
+                            <td key={col} className="px-4 py-2 text-[#E4E4E7]">
+                              {fmtValue(row[col], response.chart_spec?.formatters[col])}
+                            </td>
+                          ))}
+                        </tr>
                       ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* Follow-up prompts */}

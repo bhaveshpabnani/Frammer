@@ -391,7 +391,11 @@ export interface AgentPlan {
     | 'top_n'
     | 'diagnostic'
     | 'raw_table'
-    | 'explain_metric';
+    | 'explain_metric'
+    | 'schema_info'
+    | 'capabilities'
+    | 'data_overview'
+    | 'clarification';
   metrics: string[];
   dimensions: string[];
   filters: Record<string, unknown>;
@@ -401,6 +405,8 @@ export interface AgentPlan {
   limit: number;
   chart?: AgentChartRequest | null;
   explanation_level: 'short' | 'normal' | 'detailed';
+  execution_strategy?: 'sql_query' | 'service_call' | 'multi_query';
+  service_name?: string | null;
 }
 
 export interface AgentValidationIssue {
@@ -431,7 +437,7 @@ export interface AgentPlanResponse {
   interpreted_question: string;
   plan: AgentPlan;
   resolved_filters: Record<string, unknown>;
-  planner_source: 'openai' | 'deterministic' | 'supplied_plan';
+  planner_source: 'openai' | 'deterministic' | 'supplied_plan' | 'service';
   planner_model?: string | null;
   planner_confidence?: number | null;
   planner_fallback_reason?: string | null;
@@ -440,12 +446,31 @@ export interface AgentPlanResponse {
   validation_issues: AgentValidationIssue[];
 }
 
+export interface StatValue {
+  label: string;
+  value: number | string;
+  unit?: string | null;
+  delta_pct?: number | null;
+  trend?: 'up' | 'down' | 'flat' | null;
+}
+
+export interface ResponseBlock {
+  block_type: 'markdown' | 'stat' | 'chart' | 'table' | 'kpi_grid';
+  title?: string | null;
+  content?: string | null;
+  columns?: string[];
+  rows?: unknown[][];
+  chart_spec?: AgentChartSpec | null;
+  stats?: StatValue[];
+  sql?: string | null;
+}
+
 export interface AgentQueryResponse {
   question: string;
   interpreted_question: string;
   plan: AgentPlan;
   resolved_filters: Record<string, unknown>;
-  planner_source: 'openai' | 'deterministic' | 'supplied_plan';
+  planner_source: 'openai' | 'deterministic' | 'supplied_plan' | 'service';
   planner_model?: string | null;
   planner_confidence?: number | null;
   planner_fallback_reason?: string | null;
@@ -459,6 +484,7 @@ export interface AgentQueryResponse {
   follow_ups: string[];
   execution_time_ms: number;
   row_count: number;
+  blocks?: ResponseBlock[];
 }
 
 // ── Funnel ────────────────────────────────────────────────────────────────────
