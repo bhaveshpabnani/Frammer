@@ -1,6 +1,7 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { Badge } from '@/components/ui/badge';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Button } from '@/components/ui/button';
 import { DashboardLayout } from '@/components/dashboard-layout';
 import { Textarea } from '@/components/ui/textarea';
@@ -17,6 +18,22 @@ import {
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import { Bot, LoaderCircle, Plus, Send, Sparkles } from 'lucide-react';
+
+const mdComponents = {
+  h1: ({ children }: React.HTMLAttributes<HTMLHeadingElement>) => <h1 className="text-base font-semibold text-white mb-1">{children}</h1>,
+  h2: ({ children }: React.HTMLAttributes<HTMLHeadingElement>) => <h2 className="text-sm font-semibold text-white mt-3 mb-1 first:mt-0">{children}</h2>,
+  h3: ({ children }: React.HTMLAttributes<HTMLHeadingElement>) => <h3 className="text-[13px] font-semibold text-[#ECECF2] mt-2 mb-0.5">{children}</h3>,
+  p:  ({ children }: React.HTMLAttributes<HTMLParagraphElement>) => <p className="text-sm leading-6 text-[#ECECF2] mt-1 first:mt-0">{children}</p>,
+  strong: ({ children }: React.HTMLAttributes<HTMLElement>) => <strong className="font-semibold text-white">{children}</strong>,
+  ul: ({ children }: React.HTMLAttributes<HTMLUListElement>) => <ul className="mt-1 space-y-0.5 list-none pl-0">{children}</ul>,
+  li: ({ children }: React.HTMLAttributes<HTMLLIElement>) => (
+    <li className="flex gap-2 text-sm leading-6 text-[#ECECF2]">
+      <span className="mt-2.5 h-1 w-1 shrink-0 rounded-full bg-[#71717A]" />
+      <span>{children}</span>
+    </li>
+  ),
+  code: ({ children }: React.HTMLAttributes<HTMLElement>) => <code className="rounded bg-white/10 px-1 py-0.5 text-[11px] font-mono text-[#E4E4E7]">{children}</code>,
+};
 
 //  Types 
 
@@ -248,7 +265,6 @@ function AssistantBubble({ msg, onFollowUp }: { msg: AssistantMessage; onFollowU
   }
 
   const { response } = msg;
-  const filterChips = Object.entries(response.resolved_filters ?? {}).filter(([, v]) => v != null);
 
   return (
     <div className="flex gap-3 px-4">
@@ -256,12 +272,14 @@ function AssistantBubble({ msg, onFollowUp }: { msg: AssistantMessage; onFollowU
         <Sparkles className="h-4 w-4 text-[#E8212B]" />
       </div>
       <div className="max-w-[80%] space-y-3 min-w-0">
-        {/* Summary text */}
-        <div className="rounded-2xl rounded-tl-sm border border-white/8 bg-[#111113] px-4 py-3">
-          <p className="text-sm leading-6 text-[#ECECF2]">{response.summary}</p>
+        {/* Summary — rendered as markdown */}
+        <div className="px-1">
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents as never}>
+            {response.summary}
+          </ReactMarkdown>
           {response.caveats.length > 0 && (
-            <div className="mt-2 space-y-1 border-t border-white/6 pt-2">
-              {response.caveats.map((c, i) => <p key={i} className="text-xs text-[#71717A]"> {c}</p>)}
+            <div className="mt-3 space-y-1">
+              {response.caveats.map((c, i) => <p key={i} className="text-xs text-[#52525B]"> {c}</p>)}
             </div>
           )}
         </div>
@@ -306,17 +324,6 @@ function AssistantBubble({ msg, onFollowUp }: { msg: AssistantMessage; onFollowU
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
-
-        {/* Resolved filter chips */}
-        {filterChips.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {filterChips.map(([k, v]) => (
-              <Badge key={k} variant="outline" className="border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] text-[#9A9AA4]">
-                <span className="mr-1 text-[#52525B]">{k}</span>{String(v)}
-              </Badge>
-            ))}
           </div>
         )}
 
@@ -520,27 +527,25 @@ const AIAnalytics: React.FC = () => {
 
           {/* Input bar */}
           <div className="border-t border-white/[0.06] bg-[#0A0A0C] p-4">
-            <div className="mx-auto max-w-3xl">
-              <div className="flex items-end gap-3 rounded-2xl border border-white/10 bg-[#111113] px-4 py-3">
-                <Textarea
-                  ref={textareaRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitQuestion(input); } }}
-                  placeholder="Ask about publish rates, trends, channels, languages"
-                  className="min-h-[20px] max-h-32 flex-1 resize-none border-0 bg-transparent p-0 text-sm text-white shadow-none placeholder:text-[#3F3F46] focus-visible:ring-0"
-                  rows={1}
-                />
-                <Button
-                  type="button"
-                  size="icon"
-                  disabled={!input.trim() || queryMutation.isPending}
-                  onClick={() => submitQuestion(input)}
-                  className="h-8 w-8 shrink-0 rounded-xl bg-[#E8212B] shadow-[0_4px_16px_rgba(232,33,43,0.3)] hover:bg-[#cc1c25] disabled:opacity-40"
-                >
-                  {queryMutation.isPending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                </Button>
-              </div>
+            <div className="relative mx-auto max-w-3xl">
+              <Textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitQuestion(input); } }}
+                placeholder="Ask about publish rates, trends, channels, languages"
+                className="w-full resize-none rounded-2xl border border-white/10 bg-[#111113] py-3.5 pl-4 pr-14 text-sm text-white shadow-none placeholder:text-[#3F3F46] focus-visible:ring-0 focus-visible:border-white/20 min-h-[52px] max-h-32"
+                rows={1}
+              />
+              <Button
+                type="button"
+                size="icon"
+                disabled={!input.trim() || queryMutation.isPending}
+                onClick={() => submitQuestion(input)}
+                className="absolute bottom-3 right-3 h-8 w-8 shrink-0 rounded-xl bg-[#E8212B] shadow-[0_4px_16px_rgba(232,33,43,0.3)] hover:bg-[#cc1c25] disabled:opacity-40"
+              >
+                {queryMutation.isPending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </Button>
             </div>
           </div>
         </div>
