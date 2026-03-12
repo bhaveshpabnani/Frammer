@@ -74,7 +74,7 @@ export const ScorecardsContent: React.FC = () => {
         />
 
         {/* KPI strip */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-4 gap-3">
           <StatsCard
             title="Portfolio Health"
             value={avgScore}
@@ -136,6 +136,23 @@ export const ScorecardsContent: React.FC = () => {
             ))}
           </div>
         )}
+
+        {/* Dimension tab buttons */}
+        <div className="flex gap-2 flex-wrap">
+          {DIMENSIONS.map(d => (
+            <button
+              key={d}
+              onClick={() => setSelectedDim(d)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                selectedDim === d
+                  ? 'bg-frammer-red/20 text-white border border-frammer-red/30'
+                  : 'bg-[#0F0F0F] text-[#71717A] border border-transparent hover:text-white hover:bg-white/5'
+              }`}
+            >
+              {d.replace('_', ' ')}
+            </button>
+          ))}
+        </div>
 
         {/* Score bar chart */}
         {chartData.length > 0 && (
@@ -238,22 +255,6 @@ export const ScorecardsContent: React.FC = () => {
           </div>
         )}
 
-        {/* Dimension tab buttons */}
-        <div className="flex gap-2 flex-wrap">
-          {DIMENSIONS.map(d => (
-            <button
-              key={d}
-              onClick={() => setSelectedDim(d)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                selectedDim === d
-                  ? 'bg-frammer-red/20 text-white border border-frammer-red/30'
-                  : 'bg-[#0F0F0F] text-[#71717A] border border-transparent hover:text-white hover:bg-white/5'
-              }`}
-            >
-              {d.replace('_', ' ')}
-            </button>
-          ))}
-        </div>
       </div>
   );
 };
