@@ -32,6 +32,10 @@ import NotFound from '@/pages/NotFound';
 import UsageTrends from '@/pages/usage-trends';
 import MultiDimensional from '@/pages/multi-dimensional';
 import NotificationsPage from '@/pages/notifications';
+import InsightsPage from '@/pages/insights';
+import ScorecardsPage from '@/pages/scorecards';
+import PlatformAnalyticsPage from '@/pages/platform-analytics';
+import BillableAnalyticsPage from '@/pages/billable-analytics';
 // client-performance merged into client-portal
 
 const queryClient = new QueryClient();
@@ -72,6 +76,10 @@ const App = () => (
               <Route path="/usage-trends" element={<ProtectedRoute><UsageTrends /></ProtectedRoute>} />
               <Route path="/multi-dimensional" element={<ProtectedRoute><MultiDimensional /></ProtectedRoute>} />
               <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+              <Route path="/insights" element={<ProtectedRoute><InsightsPage /></ProtectedRoute>} />
+              <Route path="/scorecards" element={<ProtectedRoute><ScorecardsPage /></ProtectedRoute>} />
+              <Route path="/platform-analytics" element={<ProtectedRoute><PlatformAnalyticsPage /></ProtectedRoute>} />
+              <Route path="/billable-analytics" element={<ProtectedRoute><BillableAnalyticsPage /></ProtectedRoute>} />
               {/* /client-performance removed — merged into /client-portal */}
               <Route path="*" element={<NotFound />} />
             </Routes>
