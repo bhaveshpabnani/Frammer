@@ -30,7 +30,7 @@ const METRIC_OPTIONS: {
   { value: 'created_duration_hrs',  label: 'Created Duration (hrs)',  color: CHART_COLORS.purple },
 ];
 
-export default function ForecastingPage() {
+export function ForecastingContent() {
   const [horizon, setHorizon]               = useState<Horizon>('6');
   const [selectedMetric, setSelectedMetric] = useState<ForecastMetric>('total_uploaded');
 
@@ -67,7 +67,6 @@ export default function ForecastingPage() {
   const forecastEnd = forecasts.at(-1)?.forecast ?? lastActual;
 
   return (
-    <DashboardLayout title="Forecasting" subtitle="AI-powered metric forecasts with confidence intervals">
       <div className="space-y-5">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <PageHeader
@@ -218,6 +217,13 @@ export default function ForecastingPage() {
           </p>
         </div>
       </div>
+  );
+}
+
+export default function ForecastingPage() {
+  return (
+    <DashboardLayout title="Forecasting" subtitle="AI-powered metric forecasts with confidence intervals">
+      <ForecastingContent />
     </DashboardLayout>
   );
 }

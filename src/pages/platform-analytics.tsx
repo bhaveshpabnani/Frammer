@@ -35,7 +35,7 @@ const DarkTooltip = ({ active, payload, label }: any) => {
 
 const PIE_COLORS = [CHART_COLORS.red, CHART_COLORS.blue, CHART_COLORS.amber, CHART_COLORS.green, CHART_COLORS.purple, CHART_COLORS.cyan];
 
-const PlatformAnalyticsPage: React.FC = () => {
+export const PlatformAnalyticsContent: React.FC = () => {
   const { data: mix } = usePlatformMix();
   const { data: conversion } = usePlatformConversion();
   const { data: duration } = usePlatformDuration();
@@ -69,7 +69,6 @@ const PlatformAnalyticsPage: React.FC = () => {
   const platforms = [...platformSet];
 
   return (
-    <DashboardLayout title="Platform Analytics" subtitle="Deep platform and output-type analysis">
       <div className="space-y-6 animate-fade-in">
         <PageHeader
           title="Platform Analytics"
@@ -185,8 +184,13 @@ const PlatformAnalyticsPage: React.FC = () => {
           </ChartCard>
         )}
       </div>
-    </DashboardLayout>
   );
 };
+
+const PlatformAnalyticsPage: React.FC = () => (
+  <DashboardLayout title="Platform Analytics" subtitle="Deep platform and output-type analysis">
+    <PlatformAnalyticsContent />
+  </DashboardLayout>
+);
 
 export default PlatformAnalyticsPage;

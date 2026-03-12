@@ -39,7 +39,7 @@ function heatColor(ratio: number): string {
   return `rgb(${r},${g},${b})`;
 }
 
-const MultiDimensional: React.FC = () => {
+export const MultiDimensionalContent: React.FC = () => {
   const [dim1, setDim1] = useState('channel');
   const [dim2, setDim2] = useState('language');
   const [metric, setMetric] = useState('uploaded');
@@ -72,7 +72,7 @@ const MultiDimensional: React.FC = () => {
   const dim2Label = DIMENSION_OPTIONS.find((d) => d.value === dim2)?.label ?? dim2;
 
   return (
-    <DashboardLayout>
+    <>
       <PageHeader
         title="Multi-Dimensional Analysis"
         subtitle="Explore any two dimensions as a heatmap matrix to spot cross-dimensional patterns"
@@ -283,8 +283,14 @@ const MultiDimensional: React.FC = () => {
         />
         <span>High</span>
       </motion.div>
-    </DashboardLayout>
+    </>
   );
 };
+
+const MultiDimensional: React.FC = () => (
+  <DashboardLayout>
+    <MultiDimensionalContent />
+  </DashboardLayout>
+);
 
 export default MultiDimensional;

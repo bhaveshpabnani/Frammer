@@ -32,7 +32,7 @@ const DarkTooltip = ({ active, payload, label }: any) => {
 
 
 
-const ProcessingInsights: React.FC = () => {
+export const ProcessingInsightsContent: React.FC = () => {
   const { data: liveMonthly  } = useMonthly();
   const { data: liveBuckets  } = useDurationBuckets();
   const { data: kpis         } = useKpis();
@@ -72,7 +72,6 @@ const ProcessingInsights: React.FC = () => {
   });
 
   return (
-    <DashboardLayout title="Processing Insights" subtitle="AI pipeline performance, throughput and efficiency">
       <div className="space-y-6 animate-fade-in">
         <PageHeader
           title="Processing Insights"
@@ -285,8 +284,13 @@ const ProcessingInsights: React.FC = () => {
           </ChartCard>
         )}
       </div>
-    </DashboardLayout>
   );
 };
+
+const ProcessingInsights: React.FC = () => (
+  <DashboardLayout title="Processing Insights" subtitle="AI pipeline performance, throughput and efficiency">
+    <ProcessingInsightsContent />
+  </DashboardLayout>
+);
 
 export default ProcessingInsights;

@@ -6,7 +6,6 @@ import {
   TrendingUp,
   Play,
   Users,
-  Globe2,
   Layers,
   BookOpen,
   Settings,
@@ -16,20 +15,11 @@ import {
   Video,
   Database,
   GitBranch,
-  BarChart3,
-  Bot,
   FileText,
-  TrendingDown,
-  ShieldCheck,
   LayoutGrid,
-  Plug,
-  Calculator,
   Activity,
-  Grid3X3,
   Bell,
   Brain,
-  DollarSign,
-  MonitorSmartphone,
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { Badge } from '@/components/ui/badge';
@@ -103,12 +93,9 @@ const navGroups = [
     items: [
       { href: '/', icon: <LayoutDashboard size={18} />, label: 'Overview' },
       { href: '/dashboards', icon: <LayoutGrid size={18} />, label: 'Dashboards' },
-      { href: '/content-performance', icon: <Play size={18} />, label: 'Content Performance', badge: 'LIVE', badgeVariant: 'red' as const },
+      { href: '/content-dimensions', icon: <Layers size={18} />, label: 'Content Dimensions' },
       { href: '/channel-analytics', icon: <TrendingUp size={18} />, label: 'Channel Analytics' },
-      { href: '/output-types', icon: <Layers size={18} />, label: 'Output Types' },
-      { href: '/language-analytics', icon: <Globe2 size={18} />, label: 'Language Analytics' },
-      { href: '/usage-trends', icon: <Activity size={18} />, label: 'Usage Trends' },
-      { href: '/multi-dimensional', icon: <Grid3X3 size={18} />, label: 'Multi-Dimensional' },
+      { href: '/trends-forecasting', icon: <Activity size={18} />, label: 'Trends & Forecasting' },
     ],
   },
   {
@@ -121,17 +108,13 @@ const navGroups = [
   {
     label: 'Data',
     items: [
-      { href: '/datasets', icon: <Database size={18} />, label: 'Datasets' },
-      { href: '/connectors', icon: <Plug size={18} />, label: 'Connectors' },
-      { href: '/metrics', icon: <Calculator size={18} />, label: 'Metrics' },
+      { href: '/data-management', icon: <Database size={18} />, label: 'Data Management' },
     ],
   },
   {
     label: 'AI & Insights',
     items: [
-      { href: '/insights', icon: <Brain size={18} />, label: 'AI Insights', badge: 'AI', badgeVariant: 'purple' as const },
-      { href: '/scorecards', icon: <ShieldCheck size={18} />, label: 'Scorecards' },
-      { href: '/forecasting', icon: <TrendingDown size={18} />, label: 'Forecasting' },
+      { href: '/ai-insights', icon: <Brain size={18} />, label: 'AI Insights', badge: 'AI', badgeVariant: 'purple' as const },
     ],
   },
   {
@@ -145,15 +128,13 @@ const navGroups = [
     items: [
       { href: '/team-productivity', icon: <Users size={18} />, label: 'Team Productivity' },
       { href: '/client-portal', icon: <BookOpen size={18} />, label: 'Client Portal' },
-      { href: '/processing-insights', icon: <Cpu size={18} />, label: 'Processing Insights' },
-      { href: '/platform-analytics', icon: <MonitorSmartphone size={18} />, label: 'Platform Analytics' },
-      { href: '/billable-analytics', icon: <DollarSign size={18} />, label: 'Billable Analytics' },
+      { href: '/content-funnel', icon: <Play size={18} />, label: 'Content & Funnel', badge: 'LIVE', badgeVariant: 'red' as const },
+      { href: '/operations-quality', icon: <Cpu size={18} />, label: 'Operations & Quality' },
     ],
   },
   {
     label: 'Admin',
     items: [
-      { href: '/quality', icon: <ShieldCheck size={18} />, label: 'Data Quality' },
       { href: '/notifications', icon: <Bell size={18} />, label: 'Notifications' },
     ],
   },

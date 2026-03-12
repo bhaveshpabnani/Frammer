@@ -34,7 +34,7 @@ const DarkTooltip = ({ active, payload, label }: any) => {
 
 const SEGMENT_DIMS = ['channel', 'user', 'language', 'client', 'input_type'] as const;
 
-const BillableAnalyticsPage: React.FC = () => {
+export const BillableAnalyticsContent: React.FC = () => {
   const [segDim, setSegDim] = useState<string>('channel');
   const { data: mix } = useBillableMix();
   const { data: segments } = useBillableBySegment(segDim);
@@ -64,7 +64,6 @@ const BillableAnalyticsPage: React.FC = () => {
   ] : [];
 
   return (
-    <DashboardLayout title="Billable Analytics" subtitle="Deep billable vs non-billable analysis">
       <div className="space-y-6 animate-fade-in">
         <PageHeader
           title="Billable Analytics"
@@ -203,8 +202,13 @@ const BillableAnalyticsPage: React.FC = () => {
           </div>
         )}
       </div>
-    </DashboardLayout>
   );
 };
+
+const BillableAnalyticsPage: React.FC = () => (
+  <DashboardLayout title="Billable Analytics" subtitle="Deep billable vs non-billable analysis">
+    <BillableAnalyticsContent />
+  </DashboardLayout>
+);
 
 export default BillableAnalyticsPage;

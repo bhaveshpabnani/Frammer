@@ -52,7 +52,7 @@ const OUTPUT_COLORS = [
 const fadeIn  = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } };
 const stagger = { show: { transition: { staggerChildren: 0.06 } } };
 
-const ContentPerformance: React.FC = () => {
+export const ContentPerformanceContent: React.FC = () => {
   const navigate = useNavigate();
   const { filters, updateFilters } = useFilters();
   const [billableOnly, setBillableOnly] = useState(false);
@@ -130,13 +130,10 @@ const ContentPerformance: React.FC = () => {
   };
 
   if (isLoading) return (
-    <DashboardLayout title="Content & Funnel" subtitle="Loading…">
       <SkeletonPage statsCount={3} chartsCount={2} showTable />
-    </DashboardLayout>
   );
 
   return (
-    <DashboardLayout title="Content & Funnel" subtitle="Input types, output mix, funnel stages and content efficiency">
       <div className="space-y-6 animate-fade-in">
 
         <PageHeader
@@ -427,8 +424,13 @@ const ContentPerformance: React.FC = () => {
         </ChartCard>
 
       </div>
-    </DashboardLayout>
   );
 };
+
+const ContentPerformance: React.FC = () => (
+  <DashboardLayout title="Content & Funnel" subtitle="Input types, output mix, funnel stages and content efficiency">
+    <ContentPerformanceContent />
+  </DashboardLayout>
+);
 
 export default ContentPerformance;
