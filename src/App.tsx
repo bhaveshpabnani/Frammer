@@ -2,37 +2,33 @@ import { Toaster } from '@/components/ui/toaster';
 import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { FilterProvider } from '@/contexts/FilterContext';
 import { AuthProvider } from '@/contexts/AuthContext';
 import LoginPage from '@/components/auth/LoginPage';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 
 import Overview from '@/pages/Index';
-import ContentPerformance from '@/pages/content-performance';
 import ChannelAnalytics from '@/pages/channel-analytics';
-import OutputTypes from '@/pages/output-types';
-import LanguageAnalytics from '@/pages/language-analytics';
 import TeamProductivity from '@/pages/team-productivity';
 import ClientPortal from '@/pages/client-portal';
-import ProcessingInsights from '@/pages/processing-insights';
 import VideoExplorer from '@/pages/videos';
-import Datasets from '@/pages/datasets';
-import Connectors from '@/pages/connectors';
-import Metrics from '@/pages/metrics';
 import Queries from '@/pages/queries';
 import Dashboards from '@/pages/dashboards';
 import DashboardBuilder from '@/pages/dashboard-builder';
 import AIAnalytics from '@/pages/ai-analytics';
-import Quality from '@/pages/quality';
 import Reports from '@/pages/reports';
-import Forecasting from '@/pages/forecasting';
 import SettingsPage from '@/pages/settings';
 import NotFound from '@/pages/NotFound';
-import UsageTrends from '@/pages/usage-trends';
-import MultiDimensional from '@/pages/multi-dimensional';
 import NotificationsPage from '@/pages/notifications';
-// client-performance merged into client-portal
+
+// Merged pages
+import ContentDimensionsPage from '@/pages/content-dimensions';
+import AIInsightsPage from '@/pages/ai-insights';
+import OperationsQualityPage from '@/pages/operations-quality';
+import TrendsForecastingPage from '@/pages/trends-forecasting';
+import ContentFunnelPage from '@/pages/content-funnel';
+import DataManagementPage from '@/pages/data-management';
 
 const queryClient = new QueryClient();
 
@@ -50,29 +46,43 @@ const App = () => (
 
               {/* Protected */}
               <Route path="/" element={<ProtectedRoute><Overview /></ProtectedRoute>} />
-              <Route path="/content-performance" element={<ProtectedRoute><ContentPerformance /></ProtectedRoute>} />
               <Route path="/channel-analytics" element={<ProtectedRoute><ChannelAnalytics /></ProtectedRoute>} />
-              <Route path="/output-types" element={<ProtectedRoute><OutputTypes /></ProtectedRoute>} />
-              <Route path="/language-analytics" element={<ProtectedRoute><LanguageAnalytics /></ProtectedRoute>} />
               <Route path="/team-productivity" element={<ProtectedRoute><TeamProductivity /></ProtectedRoute>} />
               <Route path="/client-portal" element={<ProtectedRoute><ClientPortal /></ProtectedRoute>} />
-              <Route path="/processing-insights" element={<ProtectedRoute><ProcessingInsights /></ProtectedRoute>} />
               <Route path="/videos" element={<ProtectedRoute><VideoExplorer /></ProtectedRoute>} />
-              <Route path="/datasets" element={<ProtectedRoute><Datasets /></ProtectedRoute>} />
-              <Route path="/connectors" element={<ProtectedRoute><Connectors /></ProtectedRoute>} />
-              <Route path="/metrics" element={<ProtectedRoute><Metrics /></ProtectedRoute>} />
               <Route path="/queries" element={<ProtectedRoute><Queries /></ProtectedRoute>} />
               <Route path="/dashboards" element={<ProtectedRoute><Dashboards /></ProtectedRoute>} />
               <Route path="/dashboards/builder" element={<ProtectedRoute><DashboardBuilder /></ProtectedRoute>} />
               <Route path="/ai" element={<ProtectedRoute><AIAnalytics /></ProtectedRoute>} />
-              <Route path="/quality" element={<ProtectedRoute><Quality /></ProtectedRoute>} />
               <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-              <Route path="/forecasting" element={<ProtectedRoute><Forecasting /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-              <Route path="/usage-trends" element={<ProtectedRoute><UsageTrends /></ProtectedRoute>} />
-              <Route path="/multi-dimensional" element={<ProtectedRoute><MultiDimensional /></ProtectedRoute>} />
               <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
-              {/* /client-performance removed — merged into /client-portal */}
+
+              {/* Merged pages */}
+              <Route path="/content-dimensions" element={<ProtectedRoute><ContentDimensionsPage /></ProtectedRoute>} />
+              <Route path="/ai-insights" element={<ProtectedRoute><AIInsightsPage /></ProtectedRoute>} />
+              <Route path="/operations-quality" element={<ProtectedRoute><OperationsQualityPage /></ProtectedRoute>} />
+              <Route path="/trends-forecasting" element={<ProtectedRoute><TrendsForecastingPage /></ProtectedRoute>} />
+              <Route path="/content-funnel" element={<ProtectedRoute><ContentFunnelPage /></ProtectedRoute>} />
+              <Route path="/data-management" element={<ProtectedRoute><DataManagementPage /></ProtectedRoute>} />
+
+              {/* Redirects from old routes to merged pages */}
+              <Route path="/output-types" element={<Navigate to="/content-dimensions" replace />} />
+              <Route path="/language-analytics" element={<Navigate to="/content-dimensions" replace />} />
+              <Route path="/platform-analytics" element={<Navigate to="/content-dimensions" replace />} />
+              <Route path="/multi-dimensional" element={<Navigate to="/content-dimensions" replace />} />
+              <Route path="/content-performance" element={<Navigate to="/content-funnel" replace />} />
+              <Route path="/billable-analytics" element={<Navigate to="/content-funnel" replace />} />
+              <Route path="/insights" element={<Navigate to="/ai-insights" replace />} />
+              <Route path="/scorecards" element={<Navigate to="/ai-insights" replace />} />
+              <Route path="/processing-insights" element={<Navigate to="/operations-quality" replace />} />
+              <Route path="/quality" element={<Navigate to="/operations-quality" replace />} />
+              <Route path="/usage-trends" element={<Navigate to="/trends-forecasting" replace />} />
+              <Route path="/forecasting" element={<Navigate to="/trends-forecasting" replace />} />
+              <Route path="/datasets" element={<Navigate to="/data-management" replace />} />
+              <Route path="/connectors" element={<Navigate to="/data-management" replace />} />
+              <Route path="/metrics" element={<Navigate to="/data-management" replace />} />
+
               <Route path="*" element={<NotFound />} />
             </Routes>
           </FilterProvider>

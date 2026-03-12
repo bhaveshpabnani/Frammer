@@ -55,6 +55,25 @@ import {
   updateAlertRule,
   deleteAlertRule,
   fetchDeliveryLogs,
+  fetchInsightsSummary,
+  fetchInsightsRisks,
+  fetchInsightsOpportunities,
+  fetchAnomalies,
+  fetchWaterfall,
+  fetchScoresOverview,
+  fetchScoresByDimension,
+  fetchPlatformMix,
+  fetchPlatformConversion,
+  fetchPlatformDuration,
+  fetchPlatformTrend,
+  fetchBillableMix,
+  fetchBillableBySegment,
+  fetchBillableFunnel,
+  fetchBillableWaste,
+  fetchLanguageMatrix,
+  fetchLanguageLag,
+  fetchLanguageConversion,
+  fetchUnderperformingCombos,
 } from '@/api/endpoints';
 import type {
   QueryRequest,
@@ -759,6 +778,204 @@ export function useDeliveryLogs(page = 1, pageSize = 50, subscriptionId?: string
     queryKey: ['delivery-logs', page, pageSize, subscriptionId],
     queryFn: () => fetchDeliveryLogs(page, pageSize, subscriptionId),
     staleTime: 15_000,
+  });
+}
+
+// ── Insights (Position A) ─────────────────────────────────────────────────────
+export function useInsightsSummary() {
+  const { filters } = useFilters();
+  const qs = toApiParams(filters);
+  return useQuery({
+    queryKey: ['insights-summary', qs],
+    queryFn: () => fetchInsightsSummary(qs),
+    staleTime: 60_000,
+  });
+}
+
+export function useInsightsRisks() {
+  const { filters } = useFilters();
+  const qs = toApiParams(filters);
+  return useQuery({
+    queryKey: ['insights-risks', qs],
+    queryFn: () => fetchInsightsRisks(qs),
+    staleTime: 60_000,
+  });
+}
+
+export function useInsightsOpportunities() {
+  const { filters } = useFilters();
+  const qs = toApiParams(filters);
+  return useQuery({
+    queryKey: ['insights-opportunities', qs],
+    queryFn: () => fetchInsightsOpportunities(qs),
+    staleTime: 60_000,
+  });
+}
+
+// ── Anomalies & Waterfall (Position C) ────────────────────────────────────────
+export function useAnomalies(dimension?: string) {
+  const { filters } = useFilters();
+  const qs = toApiParams(filters);
+  return useQuery({
+    queryKey: ['anomalies', qs, dimension],
+    queryFn: () => fetchAnomalies(qs, dimension),
+    staleTime: 60_000,
+  });
+}
+
+export function useWaterfall(metric: string, dimension: string) {
+  const { filters } = useFilters();
+  const qs = toApiParams(filters);
+  return useQuery({
+    queryKey: ['waterfall', qs, metric, dimension],
+    queryFn: () => fetchWaterfall(qs, metric, dimension),
+    staleTime: 60_000,
+    enabled: !!metric && !!dimension,
+  });
+}
+
+// ── Health Scores (Position B) ────────────────────────────────────────────────
+export function useScoresOverview() {
+  const { filters } = useFilters();
+  const qs = toApiParams(filters);
+  return useQuery({
+    queryKey: ['scores-overview', qs],
+    queryFn: () => fetchScoresOverview(qs),
+    staleTime: 60_000,
+  });
+}
+
+export function useScoresByDimension(dimension: string) {
+  const { filters } = useFilters();
+  const qs = toApiParams(filters);
+  return useQuery({
+    queryKey: ['scores', qs, dimension],
+    queryFn: () => fetchScoresByDimension(dimension, qs),
+    staleTime: 60_000,
+    enabled: !!dimension,
+  });
+}
+
+// ── Platform Deep (Position D) ────────────────────────────────────────────────
+export function usePlatformMix() {
+  const { filters } = useFilters();
+  const qs = toApiParams(filters);
+  return useQuery({
+    queryKey: ['platform-mix', qs],
+    queryFn: () => fetchPlatformMix(qs),
+    staleTime: 30_000,
+  });
+}
+
+export function usePlatformConversion() {
+  const { filters } = useFilters();
+  const qs = toApiParams(filters);
+  return useQuery({
+    queryKey: ['platform-conversion', qs],
+    queryFn: () => fetchPlatformConversion(qs),
+    staleTime: 30_000,
+  });
+}
+
+export function usePlatformDuration() {
+  const { filters } = useFilters();
+  const qs = toApiParams(filters);
+  return useQuery({
+    queryKey: ['platform-duration', qs],
+    queryFn: () => fetchPlatformDuration(qs),
+    staleTime: 30_000,
+  });
+}
+
+export function usePlatformTrend() {
+  const { filters } = useFilters();
+  const qs = toApiParams(filters);
+  return useQuery({
+    queryKey: ['platform-trend', qs],
+    queryFn: () => fetchPlatformTrend(qs),
+    staleTime: 30_000,
+  });
+}
+
+// ── Billable Deep (Position D) ────────────────────────────────────────────────
+export function useBillableMix() {
+  const { filters } = useFilters();
+  const qs = toApiParams(filters);
+  return useQuery({
+    queryKey: ['billable-mix', qs],
+    queryFn: () => fetchBillableMix(qs),
+    staleTime: 30_000,
+  });
+}
+
+export function useBillableBySegment(dimension = 'channel') {
+  const { filters } = useFilters();
+  const qs = toApiParams(filters);
+  return useQuery({
+    queryKey: ['billable-segment', qs, dimension],
+    queryFn: () => fetchBillableBySegment(dimension, qs),
+    staleTime: 30_000,
+  });
+}
+
+export function useBillableFunnel() {
+  const { filters } = useFilters();
+  const qs = toApiParams(filters);
+  return useQuery({
+    queryKey: ['billable-funnel', qs],
+    queryFn: () => fetchBillableFunnel(qs),
+    staleTime: 30_000,
+  });
+}
+
+export function useBillableWaste() {
+  const { filters } = useFilters();
+  const qs = toApiParams(filters);
+  return useQuery({
+    queryKey: ['billable-waste', qs],
+    queryFn: () => fetchBillableWaste(qs),
+    staleTime: 30_000,
+  });
+}
+
+// ── Language Deep (Position D) ────────────────────────────────────────────────
+export function useLanguageMatrix(cross = 'output_type') {
+  const { filters } = useFilters();
+  const qs = toApiParams(filters);
+  return useQuery({
+    queryKey: ['language-matrix', qs, cross],
+    queryFn: () => fetchLanguageMatrix(qs, cross),
+    staleTime: 30_000,
+  });
+}
+
+export function useLanguageLag() {
+  const { filters } = useFilters();
+  const qs = toApiParams(filters);
+  return useQuery({
+    queryKey: ['language-lag', qs],
+    queryFn: () => fetchLanguageLag(qs),
+    staleTime: 30_000,
+  });
+}
+
+export function useLanguageConversion() {
+  const { filters } = useFilters();
+  const qs = toApiParams(filters);
+  return useQuery({
+    queryKey: ['language-conversion', qs],
+    queryFn: () => fetchLanguageConversion(qs),
+    staleTime: 30_000,
+  });
+}
+
+export function useUnderperformingCombos(minVolume = 5) {
+  const { filters } = useFilters();
+  const qs = toApiParams(filters);
+  return useQuery({
+    queryKey: ['underperforming-combos', qs, minVolume],
+    queryFn: () => fetchUnderperformingCombos(qs, minVolume),
+    staleTime: 30_000,
   });
 }
 

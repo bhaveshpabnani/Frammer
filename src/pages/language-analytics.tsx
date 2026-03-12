@@ -38,7 +38,7 @@ const LANG_COLORS = [
   CHART_COLORS.rose, CHART_COLORS.orange,
 ];
 
-const LanguageAnalytics: React.FC = () => {
+export const LanguageAnalyticsContent: React.FC = () => {
   const { data: liveLanguages } = useLanguages();
   const { data: monthlyData } = useMonthly();
   const { data: langChannelData, isLoading: matrixLoading } = useMultiDimensional('language', 'channel', 'uploaded', 8);
@@ -92,7 +92,6 @@ const LanguageAnalytics: React.FC = () => {
   }));
 
   return (
-    <DashboardLayout title="Language Analytics" subtitle="Content output broken down by language">
       <div className="space-y-6 animate-fade-in">
         <PageHeader
           title="Language Analytics"
@@ -338,8 +337,13 @@ const LanguageAnalytics: React.FC = () => {
         </ChartCard>
 
       </div>
-    </DashboardLayout>
   );
 };
+
+const LanguageAnalytics: React.FC = () => (
+  <DashboardLayout title="Language Analytics" subtitle="Content output broken down by language">
+    <LanguageAnalyticsContent />
+  </DashboardLayout>
+);
 
 export default LanguageAnalytics;

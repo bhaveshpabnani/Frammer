@@ -51,6 +51,24 @@ import type {
   AlertRuleUpdate,
   AlertRuleResponse,
   DeliveryLogPage,
+  InsightResponse,
+  InsightItem,
+  AnomalyItem,
+  WaterfallResponse,
+  ScoreOverviewResponse,
+  ScoreResponse,
+  PlatformMixResponse,
+  PlatformConversionRow,
+  PlatformDurationRow,
+  PlatformTrendRow,
+  BillableMixRow,
+  BillableSegmentRow,
+  BillableFunnelResponse,
+  BillableWasteRow,
+  LanguageMatrixResponse,
+  LanguageLagRow,
+  LanguageConversionRow,
+  UnderperformingCombo,
 } from './types';
 
 // Domain-prefixed canonical paths (Phase 4)
@@ -62,6 +80,7 @@ const CONTENT = '/api/v1/content';
 const DIAG    = '/api/v1/diagnostics';
 const DETAIL  = '/api/v1/detail';
 const AGENT   = '/api/v1/agent';
+const INSIGHTS = '/api/v1/insights';
 
 // ── Core ───────────────────────────────────────────────────────────────────────
 export const fetchKpis = (qs: string) =>
@@ -231,6 +250,88 @@ export const runQuery = (req: QueryRequest) =>
 
 export const planAgentQuery = (req: AgentQueryRequest, qs = '') =>
   apiPostWithMeta<AgentPlanResponse>(`${AGENT}/plan${qs ? '?' + qs : ''}`, req);
+
+// ── Insights (Position A) ─────────────────────────────────────────────────────
+export const fetchInsightsSummary = (qs: string) =>
+  apiFetch<InsightResponse>(`${INSIGHTS}/summary${qs ? '?' + qs : ''}`);
+
+export const fetchInsightsRisks = (qs: string) =>
+  apiFetch<InsightItem[]>(`${INSIGHTS}/risks${qs ? '?' + qs : ''}`);
+
+export const fetchInsightsOpportunities = (qs: string) =>
+  apiFetch<InsightItem[]>(`${INSIGHTS}/opportunities${qs ? '?' + qs : ''}`);
+
+// ── Anomalies & Waterfall (Position C) ────────────────────────────────────────
+export const fetchAnomalies = (qs: string, dimension?: string) => {
+  const path = dimension
+    ? `${INSIGHTS}/anomalies/${encodeURIComponent(dimension)}`
+    : `${INSIGHTS}/anomalies`;
+  return apiFetch<AnomalyItem[]>(`${path}${qs ? '?' + qs : ''}`);
+};
+
+export const fetchWaterfall = (qs: string, metric: string, dimension: string) => {
+  const params = new URLSearchParams(qs);
+  params.set('metric', metric);
+  params.set('dimension', dimension);
+  return apiFetch<WaterfallResponse>(`${INSIGHTS}/waterfall?${params.toString()}`);
+};
+
+// ── Health Scores (Position B) ────────────────────────────────────────────────
+export const fetchScoresOverview = (qs: string) =>
+  apiFetch<ScoreOverviewResponse>(`${DIAG}/scores/overview${qs ? '?' + qs : ''}`);
+
+export const fetchScoresByDimension = (dimension: string, qs: string) =>
+  apiFetch<ScoreResponse>(
+    `${DIAG}/scores/${encodeURIComponent(dimension)}${qs ? '?' + qs : ''}`
+  );
+
+// ── Platform Deep (Position D) ────────────────────────────────────────────────
+export const fetchPlatformMix = (qs: string) =>
+  apiFetch<PlatformMixResponse>(`${CONTENT}/platforms/mix${qs ? '?' + qs : ''}`);
+
+export const fetchPlatformConversion = (qs: string) =>
+  apiFetch<PlatformConversionRow[]>(`${CONTENT}/platforms/conversion${qs ? '?' + qs : ''}`);
+
+export const fetchPlatformDuration = (qs: string) =>
+  apiFetch<PlatformDurationRow[]>(`${CONTENT}/platforms/duration${qs ? '?' + qs : ''}`);
+
+export const fetchPlatformTrend = (qs: string) =>
+  apiFetch<PlatformTrendRow[]>(`${CONTENT}/platforms/trend${qs ? '?' + qs : ''}`);
+
+// ── Billable Deep (Position D) ────────────────────────────────────────────────
+export const fetchBillableMix = (qs: string) =>
+  apiFetch<BillableMixRow[]>(`${PERF}/billable/mix${qs ? '?' + qs : ''}`);
+
+export const fetchBillableBySegment = (dimension: string, qs: string) => {
+  const params = new URLSearchParams(qs);
+  params.set('dimension', dimension);
+  return apiFetch<BillableSegmentRow[]>(`${PERF}/billable/by-segment?${params.toString()}`);
+};
+
+export const fetchBillableFunnel = (qs: string) =>
+  apiFetch<BillableFunnelResponse>(`${PERF}/billable/funnel${qs ? '?' + qs : ''}`);
+
+export const fetchBillableWaste = (qs: string) =>
+  apiFetch<BillableWasteRow[]>(`${PERF}/billable/waste${qs ? '?' + qs : ''}`);
+
+// ── Language Deep (Position D) ────────────────────────────────────────────────
+export const fetchLanguageMatrix = (qs: string, cross = 'output_type') => {
+  const params = new URLSearchParams(qs);
+  params.set('cross', cross);
+  return apiFetch<LanguageMatrixResponse>(`${CONTENT}/languages/matrix?${params.toString()}`);
+};
+
+export const fetchLanguageLag = (qs: string) =>
+  apiFetch<LanguageLagRow[]>(`${CONTENT}/languages/lag${qs ? '?' + qs : ''}`);
+
+export const fetchLanguageConversion = (qs: string) =>
+  apiFetch<LanguageConversionRow[]>(`${CONTENT}/languages/conversion${qs ? '?' + qs : ''}`);
+
+export const fetchUnderperformingCombos = (qs: string, minVolume = 5) => {
+  const params = new URLSearchParams(qs);
+  params.set('min_volume', String(minVolume));
+  return apiFetch<UnderperformingCombo[]>(`${CONTENT}/languages/underperforming?${params.toString()}`);
+};
 
 export const runAgentQuery = (req: AgentQueryRequest, qs = '') =>
   apiPostWithMeta<AgentQueryResponse>(`${AGENT}/query${qs ? '?' + qs : ''}`, req);

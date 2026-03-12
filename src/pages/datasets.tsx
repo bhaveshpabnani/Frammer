@@ -116,7 +116,7 @@ const DATA_TYPE_COLORS: Record<string, string> = {
   boolean: 'text-green-400 bg-green-500/10 border-green-500/20',
 };
 
-export default function DatasetsPage() {
+export function DatasetsContent() {
   const [datasets, setDatasets] = useState<DatasetEntry[]>(MOCK_DATASETS);
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -191,7 +191,7 @@ export default function DatasetsPage() {
   };
 
   return (
-    <DashboardLayout title="Dataset Manager" subtitle="Upload and profile your data sources">
+    <>
       <div className="space-y-6">
         <PageHeader
           title="Dataset Manager"
@@ -384,6 +384,14 @@ export default function DatasetsPage() {
           )}
         </DialogContent>
       </Dialog>
+    </>
+  );
+}
+
+export default function DatasetsPage() {
+  return (
+    <DashboardLayout title="Dataset Manager" subtitle="Upload and profile your data sources">
+      <DatasetsContent />
     </DashboardLayout>
   );
 }
