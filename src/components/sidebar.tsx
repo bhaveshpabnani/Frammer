@@ -27,6 +27,9 @@ import {
   Activity,
   Grid3X3,
   Bell,
+  Brain,
+  DollarSign,
+  MonitorSmartphone,
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { Badge } from '@/components/ui/badge';
@@ -126,6 +129,8 @@ const navGroups = [
   {
     label: 'AI & Insights',
     items: [
+      { href: '/insights', icon: <Brain size={18} />, label: 'AI Insights', badge: 'AI', badgeVariant: 'purple' as const },
+      { href: '/scorecards', icon: <ShieldCheck size={18} />, label: 'Scorecards' },
       { href: '/forecasting', icon: <TrendingDown size={18} />, label: 'Forecasting' },
     ],
   },
@@ -141,6 +146,8 @@ const navGroups = [
       { href: '/team-productivity', icon: <Users size={18} />, label: 'Team Productivity' },
       { href: '/client-portal', icon: <BookOpen size={18} />, label: 'Client Portal' },
       { href: '/processing-insights', icon: <Cpu size={18} />, label: 'Processing Insights' },
+      { href: '/platform-analytics', icon: <MonitorSmartphone size={18} />, label: 'Platform Analytics' },
+      { href: '/billable-analytics', icon: <DollarSign size={18} />, label: 'Billable Analytics' },
     ],
   },
   {

@@ -554,6 +554,7 @@ export interface GrowthDriverRow {
 
 export interface GrowthDriversResponse {
   dimension: string;
+  metric: string;
   period_current: string;
   period_prev: string;
   total_delta: number;
@@ -721,6 +722,9 @@ export interface BenchmarkSegmentRow {
   peer_avg: number;
   percentile: number;
   trend_delta: number | null;
+  health_score: number | null;
+  risk_level: string | null;
+  grade: string | null;
 }
 
 export interface BenchmarkResponse {
@@ -912,4 +916,208 @@ export interface DeliveryLogPage {
   page: number;
   page_size: number;
   total_pages: number;
+}
+
+// ── Insights (Position A) ─────────────────────────────────────────────────────
+export interface InsightItem {
+  title: string;
+  severity: string;
+  detail: string;
+  affected_metric: string;
+  affected_dimension: string | null;
+  potential_impact: string;
+  suggested_action: string;
+}
+
+export interface DriverItem {
+  metric: string;
+  segment: string;
+  dimension: string;
+  contribution_pct: number;
+  direction: string;
+}
+
+export interface InsightResponse {
+  executive_summary: string;
+  top_risks: InsightItem[];
+  top_opportunities: InsightItem[];
+  likely_drivers: DriverItem[];
+  generated_at: string;
+}
+
+// ── Health Scores (Position B) ────────────────────────────────────────────────
+export interface ScoreSegment {
+  segment: string;
+  health_score: number;
+  risk_level: string;
+  grade: string;
+  volume_rank: number;
+  conversion_rate: number;
+  lag_score: number;
+  sla_score: number;
+  trend_direction: string;
+  trend_delta: number;
+}
+
+export interface ScoreResponse {
+  dimension: string;
+  segments: ScoreSegment[];
+  portfolio_avg_score: number;
+  critical_count: number;
+  warning_count: number;
+  healthy_count: number;
+}
+
+export interface ScoreOverviewItem {
+  dimension: string;
+  portfolio_avg_score: number;
+  critical_count: number;
+  warning_count: number;
+  healthy_count: number;
+  worst_segment: string;
+  worst_score: number;
+}
+
+export interface ScoreOverviewResponse {
+  overview: ScoreOverviewItem[];
+}
+
+// ── Anomalies & Waterfall (Position C) ────────────────────────────────────────
+export interface AnomalyItem {
+  segment: string;
+  dimension: string;
+  metric: string;
+  current_value: number;
+  previous_value: number;
+  change_pct: number;
+  severity: string;
+  explanation: string | null;
+}
+
+export interface WaterfallSegment {
+  segment: string;
+  current_value: number;
+  previous_value: number;
+  delta: number;
+  share_of_total_delta: number;
+  cumulative_share: number;
+  explanation: string | null;
+}
+
+export interface WaterfallResponse {
+  dimension: string;
+  metric: string;
+  total_delta: number;
+  segments: WaterfallSegment[];
+}
+
+// ── Platform Deep (Position D) ────────────────────────────────────────────────
+export interface PlatformMixCell {
+  platform: string;
+  output_type: string;
+  published_count: number;
+  duration_hrs: number;
+}
+
+export interface PlatformMixResponse {
+  platforms: string[];
+  output_types: string[];
+  cells: PlatformMixCell[];
+}
+
+export interface PlatformConversionRow {
+  platform: string;
+  total: number;
+  published: number;
+  conversion_pct: number;
+  portfolio_avg: number;
+}
+
+export interface PlatformDurationRow {
+  platform: string;
+  duration_hrs: number;
+  count: number;
+  share_pct: number;
+}
+
+export interface PlatformTrendRow {
+  year: number;
+  month: number;
+  month_label: string;
+  platform: string;
+  count: number;
+}
+
+// ── Billable Deep (Position D) ────────────────────────────────────────────────
+export interface BillableMixRow {
+  year: number;
+  month: number;
+  month_label: string;
+  billable_count: number;
+  non_billable_count: number;
+  total: number;
+  billable_pct: number;
+}
+
+export interface BillableSegmentRow {
+  segment: string;
+  billable: number;
+  non_billable: number;
+  total: number;
+  billable_pct: number;
+}
+
+export interface BillableFunnelResponse {
+  uploaded: number;
+  published: number;
+  billable: number;
+  publish_rate: number;
+  billable_rate: number;
+  billable_of_published: number;
+}
+
+export interface BillableWasteRow {
+  channel: string;
+  waste_count: number;
+  waste_hrs: number;
+}
+
+// ── Language Deep (Position D) ────────────────────────────────────────────────
+export interface LanguageMatrixCell {
+  language: string;
+  cross_segment: string;
+  uploaded: number;
+  published: number;
+  conversion_pct: number;
+}
+
+export interface LanguageMatrixResponse {
+  languages: string[];
+  cross_segments: string[];
+  cells: LanguageMatrixCell[];
+}
+
+export interface LanguageLagRow {
+  language: string;
+  count: number;
+  avg_processing_lag_hrs: number;
+  avg_publishing_lag_hrs: number;
+  avg_cycle_lag_hrs: number;
+}
+
+export interface LanguageConversionRow {
+  language: string;
+  uploaded: number;
+  published: number;
+  conversion_pct: number;
+  portfolio_avg: number;
+  gap_vs_avg: number;
+}
+
+export interface UnderperformingCombo {
+  language: string;
+  channel: string;
+  uploaded: number;
+  published: number;
+  conversion_pct: number;
 }
