@@ -104,7 +104,7 @@ export const fetchForecast = (metric: string, horizon = 6, qs = '') =>
 
 export const fetchGrowthDrivers = (dimension: string, qs: string) =>
   apiFetch<GrowthDriversResponse>(
-    `${TRENDS}/growth/drivers?dim=${encodeURIComponent(dimension)}${qs ? '&' + qs : ''}`
+    `${TRENDS}/growth/drivers?dimension=${encodeURIComponent(dimension)}${qs ? '&' + qs : ''}`
   );
 
 // ── Performance ────────────────────────────────────────────────────────────────
