@@ -156,7 +156,7 @@ const MOCK_TABLES = [
   'stg_processing_log',
 ];
 
-export default function ConnectorsPage() {
+export function ConnectorsContent() {
   const [selected, setSelected] = useState<ConnectorConfig | null>(null);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [connStatus, setConnStatus] = useState<ConnectorStatus>('idle');
@@ -197,7 +197,7 @@ export default function ConnectorsPage() {
   };
 
   return (
-    <DashboardLayout title="Data Connectors" subtitle="Connect to databases and external data sources">
+    <>
       <div className="space-y-6">
         <PageHeader
           title="Data Connectors"
@@ -367,6 +367,14 @@ export default function ConnectorsPage() {
           </div>
         </DialogContent>
       </Dialog>
+    </>
+  );
+}
+
+export default function ConnectorsPage() {
+  return (
+    <DashboardLayout title="Data Connectors" subtitle="Connect to databases and external data sources">
+      <ConnectorsContent />
     </DashboardLayout>
   );
 }

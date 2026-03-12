@@ -32,7 +32,7 @@ const DarkTooltip = ({ active, payload, label }: any) => {
   );
 };
 
-const OutputTypes: React.FC = () => {
+export const OutputTypesContent: React.FC = () => {
   const { data: liveOutputTypes } = useOutputTypes();
   const { data: liveMonthly } = useMonthly();
   const { data: outChannelData, isLoading: matrixLoading } = useMultiDimensional('output_type', 'channel', 'uploaded', 8);
@@ -70,7 +70,6 @@ const OutputTypes: React.FC = () => {
   });
 
   return (
-    <DashboardLayout title="Output Types" subtitle="Breakdown of all short-form content formats produced">
       <div className="space-y-6 animate-fade-in">
         <PageHeader
           title="Output Type Analytics"
@@ -246,8 +245,13 @@ const OutputTypes: React.FC = () => {
         </ChartCard>
 
       </div>
-    </DashboardLayout>
   );
 };
+
+const OutputTypes: React.FC = () => (
+  <DashboardLayout title="Output Types" subtitle="Breakdown of all short-form content formats produced">
+    <OutputTypesContent />
+  </DashboardLayout>
+);
 
 export default OutputTypes;

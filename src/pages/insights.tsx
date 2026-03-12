@@ -38,7 +38,7 @@ const SEVERITY_COLORS: Record<string, string> = {
   critical: '#ef4444',
 };
 
-const InsightsPage: React.FC = () => {
+export const InsightsContent: React.FC = () => {
   const { data: insights, isLoading: insightsLoading } = useInsightsSummary();
   const { data: anomalies } = useAnomalies();
   const [waterfallMetric] = useState('uploaded');
@@ -51,7 +51,6 @@ const InsightsPage: React.FC = () => {
   const anomalyCount = anomalies?.length ?? 0;
 
   return (
-    <DashboardLayout title="Insights" subtitle="AI-powered risk, opportunity, and driver analysis">
       <div className="space-y-6 animate-fade-in">
         <PageHeader
           title="Insights & Recommendations"
@@ -301,8 +300,13 @@ const InsightsPage: React.FC = () => {
           </div>
         )}
       </div>
-    </DashboardLayout>
   );
 };
+
+const InsightsPage: React.FC = () => (
+  <DashboardLayout title="AI Insights" subtitle="LLM-powered executive summary, anomalies, and growth drivers">
+    <InsightsContent />
+  </DashboardLayout>
+);
 
 export default InsightsPage;

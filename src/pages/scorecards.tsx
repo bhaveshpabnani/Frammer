@@ -46,7 +46,7 @@ const RISK_COLORS: Record<string, string> = {
 
 const DIMENSIONS = ['channel', 'user', 'language', 'client', 'input_type', 'output_type'] as const;
 
-const ScorecardsPage: React.FC = () => {
+export const ScorecardsContent: React.FC = () => {
   const [selectedDim, setSelectedDim] = useState<string>('channel');
   const { data: overview } = useScoresOverview();
   const { data: scores } = useScoresByDimension(selectedDim);
@@ -66,7 +66,6 @@ const ScorecardsPage: React.FC = () => {
   })) ?? [];
 
   return (
-    <DashboardLayout title="Scorecards" subtitle="Health scores and grades across all dimensions">
       <div className="space-y-6 animate-fade-in">
         <PageHeader
           title="Health Scorecards"
@@ -256,8 +255,13 @@ const ScorecardsPage: React.FC = () => {
           ))}
         </div>
       </div>
-    </DashboardLayout>
   );
 };
+
+const ScorecardsPage: React.FC = () => (
+  <DashboardLayout title="Scorecards" subtitle="Portfolio health scores across all dimensions">
+    <ScorecardsContent />
+  </DashboardLayout>
+);
 
 export default ScorecardsPage;

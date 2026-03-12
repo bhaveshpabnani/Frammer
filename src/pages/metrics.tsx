@@ -148,7 +148,7 @@ const EMPTY_METRIC: Omit<Metric, 'id' | 'createdAt' | 'usedIn'> = {
   status: 'draft',
 };
 
-export default function MetricsPage() {
+export function MetricsContent() {
   const [metrics, setMetrics] = useState<Metric[]>(INITIAL_METRICS);
   const [editTarget, setEditTarget] = useState<Metric | null>(null);
   const [isNew, setIsNew] = useState(false);
@@ -193,7 +193,7 @@ export default function MetricsPage() {
   };
 
   return (
-    <DashboardLayout title="Metric Layer" subtitle="Define and manage reusable business metrics">
+    <>
       <div className="space-y-6">
         <PageHeader
           title="Semantic Metric Layer"
@@ -457,6 +457,14 @@ export default function MetricsPage() {
           </div>
         </DialogContent>
       </Dialog>
+    </>
+  );
+}
+
+export default function MetricsPage() {
+  return (
+    <DashboardLayout title="Metric Layer" subtitle="Define and manage reusable business metrics">
+      <MetricsContent />
     </DashboardLayout>
   );
 }

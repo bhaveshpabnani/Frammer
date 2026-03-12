@@ -101,7 +101,7 @@ function ScoreGauge({ score }: { score: number }) {
   );
 }
 
-const Quality: React.FC = () => {
+export const QualityContent: React.FC = () => {
   const navigate                             = useNavigate();
   const [activeTab, setActiveTab]            = useState('summary');
   const [issueCategory, setIssueCategory]   = useState<string>('all');
@@ -146,13 +146,11 @@ const Quality: React.FC = () => {
   });
 
   if (summaryLoading) return (
-    <DashboardLayout title="Data Quality" subtitle="Loading…">
       <SkeletonPage statsCount={4} chartsCount={1} showTable />
-    </DashboardLayout>
   );
 
   return (
-    <DashboardLayout title="Data Quality" subtitle="Comprehensive DQ diagnostics — fields, rules, and issues">
+    <>
       <div className="space-y-6 animate-fade-in">
 
         <PageHeader
@@ -482,8 +480,14 @@ const Quality: React.FC = () => {
       <EmailReportModal open={emailModalOpen} onOpenChange={setEmailModalOpen} />
       <SubscriptionModal open={subModalOpen} onOpenChange={setSubModalOpen} />
       <AlertRuleModal open={alertModalOpen} onOpenChange={setAlertModalOpen} />
-    </DashboardLayout>
+    </>
   );
 };
+
+const Quality: React.FC = () => (
+  <DashboardLayout title="Data Quality" subtitle="Comprehensive DQ diagnostics — fields, rules, and issues">
+    <QualityContent />
+  </DashboardLayout>
+);
 
 export default Quality;

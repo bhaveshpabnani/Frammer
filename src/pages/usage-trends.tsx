@@ -189,7 +189,7 @@ const InsightPanel: React.FC<{ cards: InsightCard[] }> = ({ cards }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Main page
 // ─────────────────────────────────────────────────────────────────────────────
-const UsageTrends: React.FC = () => {
+export const UsageTrendsContent: React.FC = () => {
   const [metricMode, setMetricMode] = useState<MetricMode>('count');
   const [compareOpen, setCompareOpen] = useState(false);
 
@@ -419,7 +419,7 @@ const UsageTrends: React.FC = () => {
   }, [metricMode]);
 
   return (
-    <DashboardLayout>
+    <>
       <PageHeader
         title="Usage & Trends"
         subtitle="Upload · processing · publish volumes, conversion rates, lag, and growth diagnostics over time"
@@ -832,8 +832,14 @@ const UsageTrends: React.FC = () => {
           </ResponsiveContainer>
         </ChartCard>
       </motion.div>
-    </DashboardLayout>
+    </>
   );
 };
+
+const UsageTrends: React.FC = () => (
+  <DashboardLayout>
+    <UsageTrendsContent />
+  </DashboardLayout>
+);
 
 export default UsageTrends;
