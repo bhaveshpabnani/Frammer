@@ -31,7 +31,7 @@ export interface FilterContextValue {
 }
 
 const DEFAULT_FILTERS: FilterState = {
-  dateRange: 'last_30d',
+  dateRange: 'all_data',
   customDateFrom: null,
   customDateTo: null,
   client: 'all',
@@ -76,7 +76,7 @@ export const FilterProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (filters.teamMember !== 'all') count++;
     if (filters.inputType !== 'all') count++;
     if (filters.outputType !== 'all') count++;
-    if (filters.dateRange !== 'last_30d') count++;
+    if (!['all', 'all_data'].includes(filters.dateRange)) count++;
     if (filters.publishedFlag !== 'all') count++;
     if (filters.publishedPlatform !== 'all') count++;
     if (filters.billableFlag !== 'all') count++;

@@ -77,6 +77,10 @@ function saveDashboards(dashboards: SavedDashboard[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(dashboards));
 }
 
+function isMeaningfulFilterValue(value?: string) {
+  return Boolean(value && value !== 'all' && value !== 'all_data');
+}
+
 // ── Default official dashboards ───────────────────────────────────────────────
 
 const OFFICIAL_DASHBOARDS: SavedDashboard[] = [
@@ -97,7 +101,7 @@ const OFFICIAL_DASHBOARDS: SavedDashboard[] = [
     user_id: 'system',
     metric_version: '1.0',
     query_version:  '1.0',
-    data_range:     'last_30d',
+    data_range:     'all_data',
     drill_bookmarks: [],
   },
   {
@@ -117,7 +121,7 @@ const OFFICIAL_DASHBOARDS: SavedDashboard[] = [
     user_id: 'system',
     metric_version: '1.0',
     query_version:  '1.0',
-    data_range:     'last_30d',
+    data_range:     'all_data',
     drill_bookmarks: [],
   },
 ];
@@ -296,10 +300,10 @@ const Dashboards: React.FC = () => {
         </div>
 
         {/* Saved filter chips */}
-        {Object.entries(d.filter_state).filter(([, v]) => v && v !== 'all').length > 0 && (
+        {Object.entries(d.filter_state).filter(([, v]) => isMeaningfulFilterValue(v)).length > 0 && (
           <div className="flex flex-wrap gap-1">
             {Object.entries(d.filter_state)
-              .filter(([, v]) => v && v !== 'all')
+              .filter(([, v]) => isMeaningfulFilterValue(v))
               .map(([k, v]) => (
                 <Badge key={k} variant="secondary" className="text-[10px]">{k}: {v}</Badge>
               ))}
@@ -381,10 +385,10 @@ const Dashboards: React.FC = () => {
         {/* Current context bar */}
         <div className="frammer-card p-3 text-xs flex flex-wrap items-center gap-3">
           <span className="text-[#52525B]">Current filter state:</span>
-          {Object.entries(currentFilterState).filter(([, v]) => v && v !== 'all').length === 0 ? (
+          {Object.entries(currentFilterState).filter(([, v]) => isMeaningfulFilterValue(v)).length === 0 ? (
             <span className="text-[#71717A]">No filters active (showing all data)</span>
           ) : (
-            Object.entries(currentFilterState).filter(([, v]) => v && v !== 'all').map(([k, v]) => (
+            Object.entries(currentFilterState).filter(([, v]) => isMeaningfulFilterValue(v)).map(([k, v]) => (
               <Badge key={k} variant="secondary" className="text-[10px]">{k}: {v}</Badge>
             ))
           )}

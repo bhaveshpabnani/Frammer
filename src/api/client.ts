@@ -90,12 +90,12 @@ export async function apiPostWithMeta<T>(path: string, body: unknown): Promise<A
 export function toApiParams(filters: FilterState): string {
   const params = new URLSearchParams();
 
-  if (filters.dateRange === 'all_data') {
-    // all_data = no date filter — omit dateRange param entirely
+  if (['all', 'all_data'].includes(filters.dateRange)) {
+    // Unfiltered date mode: omit date params entirely.
   } else if (filters.dateRange === 'custom' && filters.customDateFrom && filters.customDateTo) {
     params.set('dateFrom', filters.customDateFrom);
     params.set('dateTo', filters.customDateTo);
-  } else if (filters.dateRange && filters.dateRange !== 'all') {
+  } else if (filters.dateRange) {
     params.set('dateRange', filters.dateRange);
   }
   if (filters.client && filters.client !== 'all') {

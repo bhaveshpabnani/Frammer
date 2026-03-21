@@ -72,7 +72,7 @@ const Reports: React.FC = () => {
     const parts: string[] = [];
     if (filters.client  !== 'all') parts.push(`Client: ${filters.client}`);
     if (filters.channel !== 'all') parts.push(`Channel: ${filters.channel}`);
-    if (filters.dateRange !== 'all') parts.push(`Period: ${filters.dateRange}`);
+    if (!['all', 'all_data'].includes(filters.dateRange)) parts.push(`Period: ${filters.dateRange}`);
     return parts.length > 0 ? parts.join(' · ') : 'All data (no filters applied)';
   }, [filters]);
 

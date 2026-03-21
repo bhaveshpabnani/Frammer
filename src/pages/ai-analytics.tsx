@@ -70,7 +70,7 @@ const STARTER_PROMPTS = [
 
 function buildContext(filters: FilterState): Record<string, unknown> {
   const f: Record<string, unknown> = {};
-  if (filters.dateRange !== 'all') f.date_range = filters.dateRange;
+  if (!['all', 'all_data'].includes(filters.dateRange)) f.date_range = filters.dateRange;
   if (filters.client     !== 'all') f.client    = filters.client;
   if (filters.channel    !== 'all') f.channel   = filters.channel;
   if (filters.language   !== 'all') f.language  = filters.language;
