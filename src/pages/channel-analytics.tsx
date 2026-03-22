@@ -108,8 +108,16 @@ const ChannelAnalytics: React.FC = () => {
   const lagBarData = useMemo(() => {
     if (!lagData?.by_channel) return [];
     return lagData.by_channel
-      .filter(r => r.group_value)
-      .sort((a, b) => (b.avg_processing_lag_hrs ?? 0) - (a.avg_processing_lag_hrs ?? 0))
+      .filter(
+        (r) =>
+          r.group_value &&
+          (r.avg_processing_lag_hrs != null || r.avg_publishing_lag_hrs != null),
+      )
+      .sort((a, b) => {
+        const aLag = Math.max(a.avg_processing_lag_hrs ?? -1, a.avg_publishing_lag_hrs ?? -1);
+        const bLag = Math.max(b.avg_processing_lag_hrs ?? -1, b.avg_publishing_lag_hrs ?? -1);
+        return bLag - aLag;
+      })
       .slice(0, 10)
       .map(r => ({
         channel:   r.group_value ?? '',
@@ -265,7 +273,11 @@ const ChannelAnalytics: React.FC = () => {
             tooltip="Processing lag = time from upload to processing complete. Publishing lag = processed to published."
           >
             {lagBarData.length === 0 ? (
-              <EmptyState hasFilters title="No lag data available" />
+              <EmptyState
+                hasFilters
+                title="Lag timestamps unavailable"
+                description="No lag metrics are available for the current filter set."
+              />
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
