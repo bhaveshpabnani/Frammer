@@ -52,7 +52,8 @@ const App = () => (
               <Route path="/videos" element={<ProtectedRoute><VideoExplorer /></ProtectedRoute>} />
               <Route path="/queries" element={<ProtectedRoute><Queries /></ProtectedRoute>} />
               <Route path="/dashboards" element={<ProtectedRoute><Dashboards /></ProtectedRoute>} />
-              <Route path="/dashboards/builder" element={<ProtectedRoute><DashboardBuilder /></ProtectedRoute>} />
+              <Route path="/dashboards/builder/:id" element={<ProtectedRoute><DashboardBuilder /></ProtectedRoute>} />
+              <Route path="/dashboards/builder" element={<Navigate to="/dashboards" replace />} />
               <Route path="/ai" element={<ProtectedRoute><AIAnalytics /></ProtectedRoute>} />
               <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />

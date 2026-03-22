@@ -1,9 +1,33 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ResponsiveGridLayout, useContainerWidth } from 'react-grid-layout';
 import type { LayoutItem, ResponsiveLayouts } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
-import { DashboardLayout } from '@/components/dashboard-layout';
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import {
+  ChevronLeft,
+  GripVertical,
+  Plus,
+  Save,
+  Settings2,
+  Trash2,
+} from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -13,203 +37,226 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  BarChart,
-  Bar,
-  LineChart,
-  Line,
-  PieChart,
-  Pie,
-  Cell,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
-import {
-  Save,
-  Undo2,
-  Plus,
-  Trash2,
-  BarChart3,
-  TrendingUp,
-  PieChart as PieIcon,
-  Table2,
-  Hash,
-  Settings2,
-  GripVertical,
-  ChevronLeft,
-} from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { useToast } from '@/hooks/use-toast';
-import { channelMetrics, teamMetrics, monthlyMetrics, languageData } from '@/data/mockData';
-import { CHART_COLORS } from '@/types';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+import { useFilters } from '@/contexts/FilterContext';
+import {
+  useChannels,
+  useKpis,
+  useLanguages,
+  useMonthly,
+  useOutputTypes,
+} from '@/hooks/useApi';
+import {
+  appendDashboardActivity,
+  buildLayouts,
+  createWidget,
+  loadPersonalDashboards,
+  savePersonalDashboards,
+  updatePersonalDashboard,
+  WIDGET_LIBRARY,
+  type LocalDashboard,
+  type LocalDashboardWidget,
+} from '@/lib/localDashboards';
 
-type WidgetType = 'kpi' | 'bar' | 'line' | 'area' | 'pie' | 'table';
+const PIE_FALLBACK_COLORS = ['#ef4444', '#3b82f6', '#f59e0b', '#22c55e', '#8b5cf6', '#06b6d4'];
 
-interface WidgetConfig {
-  id: string;
-  type: WidgetType;
-  title: string;
-  dataSource: string;
-  color: string;
-}
-
-const WIDGET_PALETTE: { type: WidgetType; label: string; icon: React.ReactNode; defaultW: number; defaultH: number }[] = [
-  { type: 'kpi', label: 'KPI Card', icon: <Hash size={14} />, defaultW: 2, defaultH: 2 },
-  { type: 'bar', label: 'Bar Chart', icon: <BarChart3 size={14} />, defaultW: 4, defaultH: 3 },
-  { type: 'line', label: 'Line Chart', icon: <TrendingUp size={14} />, defaultW: 4, defaultH: 3 },
-  { type: 'area', label: 'Area Chart', icon: <TrendingUp size={14} />, defaultW: 6, defaultH: 3 },
-  { type: 'pie', label: 'Pie Chart', icon: <PieIcon size={14} />, defaultW: 3, defaultH: 3 },
-  { type: 'table', label: 'Data Table', icon: <Table2 size={14} />, defaultW: 6, defaultH: 4 },
-];
-
-const DATA_SOURCES = ['Channel Metrics', 'Team Metrics', 'Monthly Trend', 'Language Data'];
-const COLORS = Object.values(CHART_COLORS);
-
-const KPI_DATA = [
-  { label: 'Videos Processed', value: '1,284', delta: '+12%' },
-  { label: 'Clips Generated', value: '4,621', delta: '+18%' },
-  { label: 'Hours Processed', value: '312 hrs', delta: '+6%' },
-  { label: 'Publish Rate', value: '73%', delta: '+3pp' },
-];
-
-function getChartData(dataSource: string) {
-  switch (dataSource) {
-    case 'Channel Metrics':
-      return channelMetrics.map((c) => ({ name: c.channel, value: c.clipsGenerated }));
-    case 'Team Metrics':
-      return teamMetrics.map((t) => ({ name: t.name.split(' ')[0], value: t.clipsGenerated }));
-    case 'Monthly Trend':
-      return monthlyMetrics.map((m) => ({ name: m.month.slice(0, 3), value: m.videosProcessed }));
-    case 'Language Data':
-      return languageData.map((l) => ({ name: l.language, value: l.count }));
-    default:
-      return [];
-  }
-}
+type DashboardData = {
+  kpis?: ReturnType<typeof useKpis>['data'];
+  monthly?: ReturnType<typeof useMonthly>['data'];
+  channels?: ReturnType<typeof useChannels>['data'];
+  languages?: ReturnType<typeof useLanguages>['data'];
+  outputTypes?: ReturnType<typeof useOutputTypes>['data'];
+  isLoading: boolean;
+  hasError: boolean;
+};
 
 const DarkTooltip: React.FC<any> = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-[#1C1C1C] border border-[#27272A] rounded-lg p-2.5 text-xs shadow-xl">
-      <p className="text-[#71717A] mb-1">{label}</p>
-      <p className="text-white font-metric">{payload[0]?.value?.toLocaleString()}</p>
+      {label && <p className="text-[#71717A] mb-1">{label}</p>}
+      <p className="text-white font-metric">
+        {typeof payload[0]?.value === 'number' ? payload[0].value.toLocaleString() : payload[0]?.value}
+      </p>
     </div>
   );
 };
 
-function WidgetContent({ config }: { config: WidgetConfig }) {
-  const data = getChartData(config.dataSource);
-  const kpiIndex = KPI_DATA.findIndex((k) => k.label.toLowerCase().includes(config.title.toLowerCase().split(' ')[0].toLowerCase()));
-  const kpi = KPI_DATA[Math.max(0, kpiIndex)];
-
-  switch (config.type) {
-    case 'kpi':
-      return (
-        <div className="flex flex-col justify-center h-full gap-1">
-          <p className="text-2xl font-metric text-white">{kpi.value}</p>
-          <p className="text-xs text-[#52525B]">{config.title}</p>
-          <span className="text-xs text-green-400">{kpi.delta}</span>
-        </div>
-      );
-    case 'bar':
-      return (
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ left: -20 }}>
-            <CartesianGrid vertical={false} stroke="#1C1C1C" />
-            <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#52525B' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 9, fill: '#52525B' }} axisLine={false} tickLine={false} />
-            <Tooltip content={<DarkTooltip />} />
-            <Bar dataKey="value" fill={config.color} radius={[3, 3, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      );
-    case 'line':
-      return (
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ left: -20 }}>
-            <CartesianGrid vertical={false} stroke="#1C1C1C" />
-            <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#52525B' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 9, fill: '#52525B' }} axisLine={false} tickLine={false} />
-            <Tooltip content={<DarkTooltip />} />
-            <Line dataKey="value" stroke={config.color} strokeWidth={2} dot={false} />
-          </LineChart>
-        </ResponsiveContainer>
-      );
-    case 'area':
-      return (
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ left: -20 }}>
-            <defs>
-              <linearGradient id={`grad-${config.id}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={config.color} stopOpacity={0.3} />
-                <stop offset="95%" stopColor={config.color} stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid vertical={false} stroke="#1C1C1C" />
-            <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#52525B' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 9, fill: '#52525B' }} axisLine={false} tickLine={false} />
-            <Tooltip content={<DarkTooltip />} />
-            <Area dataKey="value" stroke={config.color} fill={`url(#grad-${config.id})`} strokeWidth={2} />
-          </AreaChart>
-        </ResponsiveContainer>
-      );
-    case 'pie':
-      return (
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie data={data} dataKey="value" nameKey="name" innerRadius="40%" outerRadius="70%" paddingAngle={2}>
-              {data.map((_, i) => (
-                <Cell key={i} fill={COLORS[i % COLORS.length]} />
-              ))}
-            </Pie>
-            <Tooltip content={<DarkTooltip />} />
-          </PieChart>
-        </ResponsiveContainer>
-      );
-    case 'table':
-      return (
-        <div className="overflow-auto h-full text-xs">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-[#27272A]">
-                <th className="text-left text-[#52525B] py-1 pr-3 font-normal">Name</th>
-                <th className="text-right text-[#52525B] py-1 font-normal">Value</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((row) => (
-                <tr key={row.name} className="border-b border-[#1C1C1C]">
-                  <td className="text-[#A1A1AA] py-1 pr-3">{row.name}</td>
-                  <td className="text-white font-metric text-right py-1">{row.value.toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      );
-    default:
-      return null;
-  }
+function WidgetShell({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="h-full flex flex-col gap-2">
+      <div className="text-[11px] uppercase tracking-wide text-[#71717A]">{title}</div>
+      <div className="flex-1 min-h-0">{children}</div>
+    </div>
+  );
 }
 
-let idCounter = 10;
+function WidgetStateMessage({ message, tone = 'muted' }: { message: string; tone?: 'muted' | 'error' }) {
+  return (
+    <div className={cn(
+      'h-full flex items-center justify-center text-xs text-center px-3',
+      tone === 'error' ? 'text-red-400' : 'text-[#52525B]',
+    )}>
+      {message}
+    </div>
+  );
+}
+
+function renderWidget(widget: LocalDashboardWidget, data: DashboardData) {
+  if (data.hasError) {
+    return <WidgetStateMessage message="This widget could not load live data." tone="error" />;
+  }
+
+  switch (widget.kind) {
+    case 'kpi_total_videos':
+      if (data.isLoading || !data.kpis) return <WidgetStateMessage message="Loading live KPI..." />;
+      return (
+        <WidgetShell title={widget.title}>
+          <div className="flex flex-col justify-center h-full gap-1">
+            <p className="text-3xl font-metric text-white">{data.kpis.totalVideos.toLocaleString()}</p>
+            <p className="text-xs text-[#71717A]">Uploaded videos in the current filter context</p>
+          </div>
+        </WidgetShell>
+      );
+
+    case 'kpi_total_clips':
+      if (data.isLoading || !data.kpis) return <WidgetStateMessage message="Loading live KPI..." />;
+      return (
+        <WidgetShell title={widget.title}>
+          <div className="flex flex-col justify-center h-full gap-1">
+            <p className="text-3xl font-metric text-white">{data.kpis.totalClips.toLocaleString()}</p>
+            <p className="text-xs text-[#71717A]">Created clips in the current filter context</p>
+          </div>
+        </WidgetShell>
+      );
+
+    case 'kpi_publish_rate':
+      if (data.isLoading || !data.kpis) return <WidgetStateMessage message="Loading live KPI..." />;
+      return (
+        <WidgetShell title={widget.title}>
+          <div className="flex flex-col justify-center h-full gap-1">
+            <p className="text-3xl font-metric text-white">{data.kpis.publishRate.toFixed(1)}%</p>
+            <p className="text-xs text-[#71717A]">Publish conversion for the current filter context</p>
+          </div>
+        </WidgetShell>
+      );
+
+    case 'monthly_uploaded': {
+      if (data.isLoading) return <WidgetStateMessage message="Loading monthly trend..." />;
+      const rows = data.monthly ?? [];
+      if (rows.length === 0) return <WidgetStateMessage message="No monthly data available for this filter set." />;
+      return (
+        <WidgetShell title={widget.title}>
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={rows} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id={`grad-${widget.id}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={widget.color} stopOpacity={0.35} />
+                  <stop offset="95%" stopColor={widget.color} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid vertical={false} stroke="#1C1C1C" />
+              <XAxis dataKey="month" tick={{ fontSize: 9, fill: '#52525B' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 9, fill: '#52525B' }} axisLine={false} tickLine={false} />
+              <Tooltip content={<DarkTooltip />} />
+              <Area type="monotone" dataKey="videosProcessed" stroke={widget.color} fill={`url(#grad-${widget.id})`} strokeWidth={2} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </WidgetShell>
+      );
+    }
+
+    case 'top_channels': {
+      if (data.isLoading) return <WidgetStateMessage message="Loading channels..." />;
+      const rows = (data.channels ?? []).slice(0, 6).map((row) => ({
+        name: row.channel,
+        value: row.videosProcessed,
+      }));
+      if (rows.length === 0) return <WidgetStateMessage message="No channel data available for this filter set." />;
+      return (
+        <WidgetShell title={widget.title}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={rows} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+              <CartesianGrid vertical={false} stroke="#1C1C1C" />
+              <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#52525B' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 9, fill: '#52525B' }} axisLine={false} tickLine={false} />
+              <Tooltip content={<DarkTooltip />} />
+              <Bar dataKey="value" fill={widget.color} radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </WidgetShell>
+      );
+    }
+
+    case 'language_share': {
+      if (data.isLoading) return <WidgetStateMessage message="Loading language mix..." />;
+      const rows = (data.languages ?? []).slice(0, 6).map((row, index) => ({
+        name: row.language,
+        value: row.count,
+        color: row.color ?? PIE_FALLBACK_COLORS[index % PIE_FALLBACK_COLORS.length],
+      }));
+      if (rows.length === 0) return <WidgetStateMessage message="No language data available for this filter set." />;
+      return (
+        <WidgetShell title={widget.title}>
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie data={rows} dataKey="value" nameKey="name" innerRadius="40%" outerRadius="72%" paddingAngle={2}>
+                {rows.map((row) => (
+                  <Cell key={row.name} fill={row.color} />
+                ))}
+              </Pie>
+              <Tooltip content={<DarkTooltip />} />
+            </PieChart>
+          </ResponsiveContainer>
+        </WidgetShell>
+      );
+    }
+
+    case 'output_type_table': {
+      if (data.isLoading) return <WidgetStateMessage message="Loading output types..." />;
+      const rows = data.outputTypes ?? [];
+      if (rows.length === 0) return <WidgetStateMessage message="No output-type data available for this filter set." />;
+      return (
+        <WidgetShell title={widget.title}>
+          <div className="overflow-auto h-full text-xs">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-[#27272A]">
+                  <th className="text-left text-[#52525B] py-1 pr-3 font-normal">Type</th>
+                  <th className="text-right text-[#52525B] py-1 font-normal">Uploaded</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.slice(0, 8).map((row) => (
+                  <tr key={row.type} className="border-b border-[#1C1C1C]">
+                    <td className="text-[#A1A1AA] py-1 pr-3">{row.type}</td>
+                    <td className="text-white font-metric text-right py-1">{row.count.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </WidgetShell>
+      );
+    }
+
+    default:
+      return <WidgetStateMessage message="Unsupported widget." tone="error" />;
+  }
+}
 
 interface GridCanvasProps {
   layouts: ResponsiveLayouts;
   setLayouts: React.Dispatch<React.SetStateAction<ResponsiveLayouts>>;
-  widgets: WidgetConfig[];
+  widgets: LocalDashboardWidget[];
   selected: string | null;
   setSelected: (id: string) => void;
   removeWidget: (id: string) => void;
+  data: DashboardData;
 }
 
-function GridCanvas({ layouts, setLayouts, widgets, selected, setSelected, removeWidget }: GridCanvasProps) {
+function GridCanvas({ layouts, setLayouts, widgets, selected, setSelected, removeWidget, data }: GridCanvasProps) {
   const { containerRef, width } = useContainerWidth();
   return (
     <div
@@ -226,29 +273,32 @@ function GridCanvas({ layouts, setLayouts, widgets, selected, setSelected, remov
         rowHeight={60}
         margin={[12, 12]}
       >
-        {widgets.map((w) => (
+        {widgets.map((widget) => (
           <div
-            key={w.id}
-            onClick={() => setSelected(w.id)}
+            key={widget.id}
+            onClick={() => setSelected(widget.id)}
             className={cn(
               'bg-[#111111] border rounded-xl overflow-hidden flex flex-col transition-all cursor-pointer',
-              selected === w.id ? 'border-frammer-red/60 shadow-lg shadow-frammer-red/10' : 'border-[#1C1C1C] hover:border-[#3F3F46]'
+              selected === widget.id ? 'border-frammer-red/60 shadow-lg shadow-frammer-red/10' : 'border-[#1C1C1C] hover:border-[#3F3F46]',
             )}
           >
             <div className="flex items-center gap-2 px-3 py-2 border-b border-[#1C1C1C] shrink-0">
               <span className="drag-handle cursor-grab text-[#3F3F46] hover:text-[#52525B]">
                 <GripVertical size={12} />
               </span>
-              <span className="text-[11px] text-[#71717A] font-medium flex-1 truncate">{w.title}</span>
+              <span className="text-[11px] text-[#71717A] font-medium flex-1 truncate">{widget.title}</span>
               <button
-                onClick={(e) => { e.stopPropagation(); removeWidget(w.id); }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  removeWidget(widget.id);
+                }}
                 className="text-[#3F3F46] hover:text-red-400 transition-colors"
               >
                 <Trash2 size={11} />
               </button>
             </div>
             <div className="flex-1 p-3 min-h-0">
-              <WidgetContent config={w} />
+              {renderWidget(widget, data)}
             </div>
           </div>
         ))}
@@ -258,106 +308,186 @@ function GridCanvas({ layouts, setLayouts, widgets, selected, setSelected, remov
 }
 
 export default function DashboardBuilderPage() {
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { filters, updateFilters } = useFilters();
 
-  const [layouts, setLayouts] = useState<ResponsiveLayouts>({
-    lg: [
-      { i: 'w-1', x: 0, y: 0, w: 2, h: 2 },
-      { i: 'w-2', x: 2, y: 0, w: 2, h: 2 },
-      { i: 'w-3', x: 0, y: 2, w: 4, h: 3 },
-      { i: 'w-4', x: 4, y: 0, w: 4, h: 5 },
-    ],
-  });
+  const kpisQuery = useKpis();
+  const monthlyQuery = useMonthly();
+  const channelsQuery = useChannels();
+  const languagesQuery = useLanguages();
+  const outputTypesQuery = useOutputTypes();
 
-  const [widgets, setWidgets] = useState<WidgetConfig[]>([
-    { id: 'w-1', type: 'kpi', title: 'Videos Processed', dataSource: 'Channel Metrics', color: CHART_COLORS.red },
-    { id: 'w-2', type: 'kpi', title: 'Clips Generated', dataSource: 'Team Metrics', color: CHART_COLORS.blue },
-    { id: 'w-3', type: 'bar', title: 'Clips by Channel', dataSource: 'Channel Metrics', color: CHART_COLORS.red },
-    { id: 'w-4', type: 'line', title: 'Monthly Trend', dataSource: 'Monthly Trend', color: CHART_COLORS.blue },
-  ]);
-
+  const [dashboard, setDashboard] = useState<LocalDashboard | null>(null);
+  const [widgets, setWidgets] = useState<LocalDashboardWidget[]>([]);
+  const [layouts, setLayouts] = useState<ResponsiveLayouts>({ lg: [] });
   const [selected, setSelected] = useState<string | null>(null);
 
-  const selectedWidget = widgets.find((w) => w.id === selected);
+  useEffect(() => {
+    if (!id) return;
+    const saved = loadPersonalDashboards().find((item) => item.id === id) ?? null;
+    setDashboard(saved);
+    setWidgets(saved?.widgets ?? []);
+    setLayouts(saved?.layouts ?? { lg: [] });
+    setSelected(saved?.widgets[0]?.id ?? null);
+  }, [id]);
 
-  const addWidget = (palette: typeof WIDGET_PALETTE[0]) => {
-    const id = `w-${++idCounter}`;
-    const newWidget: WidgetConfig = {
-      id,
-      type: palette.type,
-      title: palette.label,
-      dataSource: 'Channel Metrics',
-      color: CHART_COLORS.red,
-    };
-    const newLayout: LayoutItem = {
-      i: id,
-      x: 0,
-      y: Infinity,
-      w: palette.defaultW,
-      h: palette.defaultH,
-    };
-    setWidgets((p) => [...p, newWidget]);
-    setLayouts((p) => ({ ...p, lg: [...(p.lg ?? []), newLayout] }));
+  useEffect(() => {
+    if (!dashboard) return;
+    updateFilters({ ...dashboard.filter_state });
+  }, [dashboard, updateFilters]);
+
+  const data: DashboardData = {
+    kpis: kpisQuery.data,
+    monthly: monthlyQuery.data,
+    channels: channelsQuery.data,
+    languages: languagesQuery.data,
+    outputTypes: outputTypesQuery.data,
+    isLoading: [kpisQuery, monthlyQuery, channelsQuery, languagesQuery, outputTypesQuery].some((query) => query.isLoading),
+    hasError: [kpisQuery, monthlyQuery, channelsQuery, languagesQuery, outputTypesQuery].some((query) => Boolean(query.error)),
   };
 
-  const removeWidget = (id: string) => {
-    setWidgets((p) => p.filter((w) => w.id !== id));
-    setLayouts((p) => ({ ...p, lg: (p.lg ?? []).filter((l) => l.i !== id) }));
-    if (selected === id) setSelected(null);
+  const selectedWidget = widgets.find((widget) => widget.id === selected) ?? null;
+
+  const addWidget = (kind: LocalDashboardWidget['kind']) => {
+    const widget = createWidget(kind);
+    const nextWidgets = [...widgets, widget];
+    const nextLayouts = buildLayouts(nextWidgets);
+    setWidgets(nextWidgets);
+    setLayouts(nextLayouts);
+    setSelected(widget.id);
   };
 
-  const updateSelected = (patch: Partial<WidgetConfig>) => {
+  const removeWidget = (widgetId: string) => {
+    const nextWidgets = widgets.filter((widget) => widget.id !== widgetId);
+    setWidgets(nextWidgets);
+    setLayouts(buildLayouts(nextWidgets));
+    if (selected === widgetId) {
+      setSelected(nextWidgets[0]?.id ?? null);
+    }
+  };
+
+  const updateSelectedWidget = (patch: Partial<LocalDashboardWidget>) => {
     if (!selected) return;
-    setWidgets((p) => p.map((w) => (w.id === selected ? { ...w, ...patch } : w)));
+    setWidgets((prev) => prev.map((widget) => (
+      widget.id === selected ? { ...widget, ...patch } : widget
+    )));
+  };
+
+  const updateDashboardMeta = (patch: Partial<LocalDashboard>) => {
+    if (!dashboard) return;
+    setDashboard({ ...dashboard, ...patch });
   };
 
   const handleSave = () => {
-    toast({ title: 'Dashboard saved', description: 'Layout and widgets persisted to localStorage.' });
-    try {
-      localStorage.setItem('frammer-builder-widgets', JSON.stringify(widgets));
-      localStorage.setItem('frammer-builder-layout', JSON.stringify(layouts));
-    } catch (_) {}
+    if (!dashboard) return;
+    const nextDashboards = updatePersonalDashboard(
+      loadPersonalDashboards(),
+      dashboard.id,
+      (current) => ({
+        ...current,
+        name: dashboard.name,
+        description: dashboard.description,
+        filter_state: {
+          client: filters.client,
+          channel: filters.channel,
+          language: filters.language,
+          dateRange: filters.dateRange,
+          teamMember: filters.teamMember,
+          inputType: filters.inputType,
+          outputType: filters.outputType,
+          publishedFlag: filters.publishedFlag,
+          publishedPlatform: filters.publishedPlatform,
+          billableFlag: filters.billableFlag,
+        },
+        widgets,
+        layouts,
+      }),
+    );
+    savePersonalDashboards(nextDashboards);
+    const nextDashboard = nextDashboards.find((item) => item.id === dashboard.id) ?? dashboard;
+    setDashboard(nextDashboard);
+    appendDashboardActivity('updated', nextDashboard);
+    toast({
+      title: 'Dashboard saved locally',
+      description: 'This dashboard was updated in browser storage only.',
+    });
   };
+
+  if (!dashboard) {
+    return (
+      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center p-6">
+        <div className="max-w-md text-center space-y-4">
+          <p className="text-white text-lg font-medium">Dashboard not found</p>
+          <p className="text-sm text-[#71717A]">
+            This local dashboard may have been deleted or only exists in a different browser session.
+          </p>
+          <Button onClick={() => navigate('/dashboards')}>Back to Dashboards</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] flex flex-col">
-      {/* Toolbar */}
       <div className="h-12 border-b border-[#1C1C1C] flex items-center px-4 gap-3 shrink-0">
         <button onClick={() => navigate('/dashboards')} className="text-[#52525B] hover:text-white transition-colors">
           <ChevronLeft size={16} />
         </button>
-        <span className="text-sm font-medium text-white">Dashboard Builder</span>
-        <Badge variant="outline" className="text-[10px] border-[#27272A] text-[#52525B]">Draft</Badge>
+        <span className="text-sm font-medium text-white truncate">{dashboard.name}</span>
+        <Badge variant="outline" className="text-[10px] border-[#27272A] text-[#52525B]">
+          Local only
+        </Badge>
         <div className="flex-1" />
-        <Button variant="ghost" size="sm" className="text-xs text-[#52525B] hover:text-white">
-          <Undo2 size={12} className="mr-1.5" /> Undo
-        </Button>
         <Button onClick={handleSave} size="sm" className="bg-frammer-red hover:bg-frammer-red/90 text-white text-xs">
-          <Save size={12} className="mr-1.5" /> Save
+          <Save size={12} className="mr-1.5" />
+          Save
         </Button>
       </div>
 
+      <div className="border-b border-[#1C1C1C] px-4 py-3 text-xs text-[#71717A]">
+        This dashboard is saved only in this browser. Widgets use live API data and inherit the dashboard&apos;s saved filter context when opened.
+      </div>
+
       <div className="flex flex-1 overflow-hidden">
-        {/* Left: Widget palette */}
-        <div className="w-52 shrink-0 border-r border-[#1C1C1C] overflow-y-auto p-3 space-y-4">
-          <p className="text-[11px] uppercase tracking-wider text-[#52525B] font-semibold">Add Widget</p>
+        <div className="w-60 shrink-0 border-r border-[#1C1C1C] overflow-y-auto p-3 space-y-4">
           <div className="space-y-1.5">
-            {WIDGET_PALETTE.map((p) => (
-              <button
-                key={p.type}
-                onClick={() => addWidget(p)}
-                className="w-full flex items-center gap-2.5 p-2.5 rounded-lg text-left bg-[#111111] hover:bg-[#1C1C1C] border border-[#1C1C1C] hover:border-[#3F3F46] transition-all group"
-              >
-                <span className="text-[#52525B] group-hover:text-frammer-red transition-colors">{p.icon}</span>
-                <span className="text-xs text-[#A1A1AA] group-hover:text-white transition-colors">{p.label}</span>
-                <Plus size={11} className="ml-auto text-[#3F3F46] group-hover:text-frammer-red transition-colors" />
-              </button>
-            ))}
+            <label className="text-[11px] text-[#71717A]">Dashboard name</label>
+            <input
+              value={dashboard.name}
+              onChange={(event) => updateDashboardMeta({ name: event.target.value })}
+              className="w-full bg-[#111111] border border-[#1C1C1C] rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-frammer-red/50"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] text-[#71717A]">Description</label>
+            <textarea
+              value={dashboard.description ?? ''}
+              onChange={(event) => updateDashboardMeta({ description: event.target.value })}
+              className="w-full min-h-[72px] resize-none bg-[#111111] border border-[#1C1C1C] rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-frammer-red/50"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-[11px] uppercase tracking-wider text-[#52525B] font-semibold">Add Widget</p>
+            <div className="space-y-1.5">
+              {WIDGET_LIBRARY.map((item) => (
+                <button
+                  key={item.kind}
+                  onClick={() => addWidget(item.kind)}
+                  className="w-full flex items-center gap-2.5 p-2.5 rounded-lg text-left bg-[#111111] hover:bg-[#1C1C1C] border border-[#1C1C1C] hover:border-[#3F3F46] transition-all group"
+                >
+                  <span className="text-xs text-[#A1A1AA] group-hover:text-white transition-colors flex-1">
+                    {item.label}
+                  </span>
+                  <Plus size={11} className="text-[#3F3F46] group-hover:text-frammer-red transition-colors" />
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Center: Grid canvas */}
         <GridCanvas
           layouts={layouts}
           setLayouts={setLayouts}
@@ -365,10 +495,10 @@ export default function DashboardBuilderPage() {
           selected={selected}
           setSelected={setSelected}
           removeWidget={removeWidget}
+          data={data}
         />
 
-        {/* Right: Config panel */}
-        <div className="w-56 shrink-0 border-l border-[#1C1C1C] overflow-y-auto p-3 space-y-4">
+        <div className="w-64 shrink-0 border-l border-[#1C1C1C] overflow-y-auto p-3 space-y-4">
           {selectedWidget ? (
             <>
               <div className="flex items-center gap-2">
@@ -380,35 +510,37 @@ export default function DashboardBuilderPage() {
                   <label className="text-[11px] text-[#71717A]">Title</label>
                   <input
                     value={selectedWidget.title}
-                    onChange={(e) => updateSelected({ title: e.target.value })}
+                    onChange={(event) => updateSelectedWidget({ title: event.target.value })}
                     className="w-full bg-[#1C1C1C] border border-[#3F3F46] rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-frammer-red/50"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[11px] text-[#71717A]">Data Source</label>
-                  <Select value={selectedWidget.dataSource} onValueChange={(v) => updateSelected({ dataSource: v })}>
+                  <label className="text-[11px] text-[#71717A]">Widget type</label>
+                  <Select value={selectedWidget.kind} onValueChange={(value) => updateSelectedWidget({ kind: value as LocalDashboardWidget['kind'] })}>
                     <SelectTrigger className="h-8 bg-[#1C1C1C] border-[#3F3F46] text-white text-xs">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-[#161616] border-[#27272A]">
-                      {DATA_SOURCES.map((ds) => (
-                        <SelectItem key={ds} value={ds} className="text-xs text-[#A1A1AA]">{ds}</SelectItem>
+                      {WIDGET_LIBRARY.map((item) => (
+                        <SelectItem key={item.kind} value={item.kind} className="text-xs text-[#A1A1AA]">
+                          {item.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[11px] text-[#71717A]">Color</label>
+                  <label className="text-[11px] text-[#71717A]">Accent color</label>
                   <div className="flex gap-1.5 flex-wrap">
-                    {COLORS.map((c) => (
+                    {PIE_FALLBACK_COLORS.map((color) => (
                       <button
-                        key={c}
-                        onClick={() => updateSelected({ color: c })}
+                        key={color}
+                        onClick={() => updateSelectedWidget({ color })}
                         className={cn(
                           'w-5 h-5 rounded-full transition-transform',
-                          selectedWidget.color === c ? 'ring-2 ring-white ring-offset-1 ring-offset-[#111111] scale-110' : ''
+                          selectedWidget.color === color ? 'ring-2 ring-white ring-offset-1 ring-offset-[#111111] scale-110' : '',
                         )}
-                        style={{ backgroundColor: c }}
+                        style={{ backgroundColor: color }}
                       />
                     ))}
                   </div>
@@ -418,7 +550,7 @@ export default function DashboardBuilderPage() {
           ) : (
             <div className="text-center py-8 space-y-2">
               <Settings2 size={20} className="text-[#3F3F46] mx-auto" />
-              <p className="text-xs text-[#52525B]">Click a widget to configure it</p>
+              <p className="text-xs text-[#52525B]">Click a widget to configure it.</p>
             </div>
           )}
         </div>
