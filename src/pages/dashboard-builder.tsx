@@ -436,9 +436,6 @@ export default function DashboardBuilderPage() {
           <ChevronLeft size={16} />
         </button>
         <span className="text-sm font-medium text-white truncate">{dashboard.name}</span>
-        <Badge variant="outline" className="text-[10px] border-[#27272A] text-[#52525B]">
-          Local only
-        </Badge>
         <div className="flex-1" />
         <Button onClick={handleSave} size="sm" className="bg-frammer-red hover:bg-frammer-red/90 text-white text-xs">
           <Save size={12} className="mr-1.5" />

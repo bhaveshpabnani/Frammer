@@ -275,9 +275,8 @@ const Dashboards: React.FC = () => {
       <div className="space-y-6 animate-fade-in">
         <div className="flex items-start justify-between gap-4">
           <PageHeader
-            title="Local Dashboards"
+            title=" Custom Dashboards"
             subtitle="Starter dashboards and personal saved views stored only in this browser"
-            badge={{ label: 'LOCAL ONLY', variant: 'blue' as any }}
             onDownload={() => {
               const source = activeTab === 'templates' ? STARTER_DASHBOARDS : personalDashboards;
               downloadCsv(
