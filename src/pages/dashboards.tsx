@@ -119,8 +119,8 @@ const Dashboards: React.FC = () => {
     setNewName('');
     setNewDesc('');
     toast({
-      title: 'Local dashboard created',
-      description: 'Saved in this browser only.',
+      title: 'Dashboard created',
+      description: 'Saved.',
     });
     openDashboard(dashboard);
   };
@@ -151,7 +151,7 @@ const Dashboards: React.FC = () => {
     syncActivity('duplicated', copy);
     toast({
       title: 'Dashboard duplicated',
-      description: 'The copy is saved in this browser only.',
+      description: 'Saved.',
     });
   };
 
@@ -297,16 +297,6 @@ const Dashboards: React.FC = () => {
             <Plus className="h-4 w-4" />
             New Dashboard
           </Button>
-        </div>
-
-        <div className="frammer-card p-4 space-y-2 text-sm">
-          <div className="flex items-center gap-2 text-[#E4E4E7] font-medium">
-            <MonitorCog className="h-4 w-4 text-frammer-red" />
-            Saved in this browser only
-          </div>
-          <p className="text-[#71717A] text-xs">
-            Dashboards are not shared across users or devices. Clearing browser storage will remove your personal dashboards and local activity history.
-          </p>
         </div>
 
         <div className="frammer-card p-3 text-xs flex flex-wrap items-center gap-3">
