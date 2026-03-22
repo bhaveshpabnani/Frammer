@@ -45,6 +45,17 @@ const DarkTooltip = ({ active, payload, label }: any) => {
 const fadeIn  = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } };
 const stagger = { show: { transition: { staggerChildren: 0.06 } } };
 
+function formatOrdinal(n: number) {
+  const abs = Math.abs(Math.round(n));
+  const mod100 = abs % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${abs}th`;
+  const mod10 = abs % 10;
+  if (mod10 === 1) return `${abs}st`;
+  if (mod10 === 2) return `${abs}nd`;
+  if (mod10 === 3) return `${abs}rd`;
+  return `${abs}th`;
+}
+
 const TeamProductivity: React.FC = () => {
   const navigate = useNavigate();
   const { updateFilters } = useFilters();
@@ -323,7 +334,7 @@ const TeamProductivity: React.FC = () => {
         {/* ── Peer Benchmark Table ──────────────────────────────────────────────── */}
         <ChartCard
           title="Peer Benchmark"
-          subtitle="User performance relative to portfolio and peer average"
+          subtitle="Current-month user performance relative to portfolio and peer average"
           height={320}
         >
           {benchLoading ? (
@@ -355,7 +366,7 @@ const TeamProductivity: React.FC = () => {
                           row.percentile >= 75 ? 'text-green-400' :
                           row.percentile >= 25 ? 'text-amber-400' : 'text-red-400',
                         )}>
-                          {row.percentile.toFixed(0)}th
+                          {formatOrdinal(row.percentile)}
                         </span>
                       </td>
                       <td className="py-2 pl-2">
