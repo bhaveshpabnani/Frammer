@@ -20,3 +20,8 @@ alembic/versions/__pycache__/
 # OS
 .DS_Store
 Thumbs.db
+
+# Secrets — never commit real credentials (GitGuardian / secret scanning)
+.env
+.env.*
+!.env.example
